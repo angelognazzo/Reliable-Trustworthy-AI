@@ -1,0 +1,20 @@
+net_1,img1_0.0500.txt,verified
+net_1,img2_0.0550.txt,verified
+net_2,img1_0.2400.txt,verified
+net_2,img2_0.2360.txt,verified
+net_3,img1_0.0065.txt,not verified
+net_3,img2_0.0081.txt,verified
+net_4,img1_0.2240.txt,verified
+net_4,img2_0.2290.txt,not verified
+net_5,img1_0.0260.txt,verified
+net_5,img2_0.0470.txt,verified
+net_6,img1_0.0140.txt,verified
+net_6,img2_0.0147.txt,not verified
+net_7,img1_0.0540.txt,verified
+net_7,img2_0.1440.txt,not verified
+net_8,img1_0.0096.txt,verified
+net_8,img2_0.0100.txt,verified
+net_9,img1_0.0040.txt,verified
+net_9,img2_0.0040.txt,verified
+net_10,img1_0.0014.txt,verified
+net_10,img2_0.0015.txt,not verified

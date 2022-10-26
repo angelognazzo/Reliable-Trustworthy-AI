@@ -1,0 +1,13 @@
+#!/bin/bash
+
+rm $1/res.txt
+for net in {1..10}
+do
+	echo Evaluating network net${net}...
+	for spec in `ls $1/net${net}/`
+	do
+		echo ${spec}
+		res=$(python verifier.py --net net${net} --spec $1/net${net}/${spec})
+		echo net${k}_${net},$spec,$res >> $1/res.txt
+	done
+done
