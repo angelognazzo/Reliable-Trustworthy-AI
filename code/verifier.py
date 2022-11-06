@@ -8,6 +8,8 @@ from networks import get_network, get_net_name, NormalizedResnet
 DEVICE = 'cpu'
 DTYPE = torch.float32
 
+# transform the image pixel values into a tensor
+# the values of the images are normalized between 0 and 1
 def transform_image(pixel_values, input_dim):
     normalized_pixel_values = torch.tensor([float(p) / 255.0 for p in pixel_values])
     if len(input_dim) > 1:
@@ -22,19 +24,30 @@ def transform_image(pixel_values, input_dim):
     assert (image <= 1).all()
     return image
 
+# spec: the path to the test case
+# dataset: a string representing the dataset the network was trained on
 def get_spec(spec, dataset):
+    # set the input dimensions based on the dataset
     input_dim = [1, 28, 28] if dataset == 'mnist' else [3, 32, 32]
     eps = float(spec[:-4].split('/')[-1].split('_')[-1])
+    # open the test case file
     test_file = open(spec, "r")
+    # read the header of the file 
     test_instances = csv.reader(test_file, delimiter=",")
+    # read the reast of the file line by line extracting the input (image pixel values) and the true label
     for i, (label, *pixel_values) in enumerate(test_instances):
+        # transform the image pixel values into a tensor
         inputs = transform_image(pixel_values, input_dim)
+        # send the tensor to the device
         inputs = inputs.to(DEVICE).to(dtype=DTYPE)
+        # trasnform the true label from an String to an integer
         true_label = int(label)
+    # returns a new tensor with a dimension of size one inserted at the specified position
     inputs = inputs.unsqueeze(0)
     return inputs, true_label, eps
 
 
+# load the trained network from the 'nets' folder
 def get_net(net, net_name):
     net = get_network(DEVICE, net)
     state_dict = torch.load('../nets/%s' % net_name, map_location=torch.device(DEVICE))
@@ -47,7 +60,11 @@ def get_net(net, net_name):
         net = NormalizedResnet(DEVICE, net)
     return net
 
-
+# net: the actual network object
+# inputs: the input image specified in the test case
+# eps: the epsilon value specified in the test case
+# true_label: the true label of the input image specified in the test case
+# TODO Implement the analysis function
 def analyze(net, inputs, eps, true_label):
     return 0
 
@@ -61,13 +78,20 @@ def main():
     net_name = get_net_name(args.net)
     dataset = 'mnist' if 'mnist' in net_name else 'cifar10'
     
+    # args.spec is the path to the test case
+    # dataset is a string representing the dataset the network was trained on
+    # get the input image, the true label and the epsilon value from the test case
     inputs, true_label, eps = get_spec(args.spec, dataset)
+    # get the actual network object. The netowrk is loaded from the 'nets' folder already trained
     net = get_net(args.net, net_name)
 
+    # get the output of the network on the input image
     outs = net(inputs)
+    # get the actual prediction by taking the index of the maximum value in the output tensor
     pred_label = outs.max(dim=1)[1].item()
     assert pred_label == true_label
 
+    # call our analysis function
     if analyze(net, inputs, eps, true_label):
         print('verified')
     else:

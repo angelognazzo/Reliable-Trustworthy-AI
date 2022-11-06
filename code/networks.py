@@ -24,10 +24,14 @@ class FullyConnected(nn.Module):
     def __init__(self, device, dataset, input_size, input_channels, fc_layers, act='relu'):
         super(FullyConnected, self).__init__()
 
+        # Normalization layer with mean and standard deviation based on the dataset
+        # and flatten the input
         layers = [Normalization(device, dataset), nn.Flatten()]
         prev_fc_size = input_size * input_size * input_channels
+        # add the fully connected layers
         for i, fc_size in enumerate(fc_layers):
             layers += [nn.Linear(prev_fc_size, fc_size)]
+            # if we are not in the last layer add the activation function (RELU)
             if i + 1 < len(fc_layers):
                 if act == 'relu':
                     layers += [nn.ReLU()]
@@ -78,6 +82,7 @@ class NormalizedResnet(nn.Module):
     def __init__(self, device, resnet):
         super(NormalizedResnet, self).__init__()
         
+        # Normalization layer with mean and standard deviation based on the dataset
         self.normalization = Normalization(device, 'cifar10')
         self.resnet = resnet
 
@@ -86,7 +91,7 @@ class NormalizedResnet(nn.Module):
         x = self.resnet(x)
         return x
 
-
+# get the actual name of the newtork as it is saved the 'nets/' folder
 def get_net_name(net):
     net_names = {
         'net1': 'net1_mnist_fc1.pt',
@@ -101,7 +106,8 @@ def get_net_name(net):
         'net10': 'net10_cifar10_resnet_4b.pt',
     }
     return net_names[net]
-    
+
+# instantiate a network with the right parameters based on the given name
 def get_network(device, net):
     if net == 'net1':
         return FullyConnected(device, 'mnist', 28, 1, [50, 10])
