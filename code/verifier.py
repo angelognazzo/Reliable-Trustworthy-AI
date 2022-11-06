@@ -60,20 +60,58 @@ def get_net(net, net_name):
         net = NormalizedResnet(DEVICE, net)
     return net
 
+# return the lower and upper bounds of the infinity norm of the input image
+def infinty_norm(inputs, pert):
+    lower = torch.maximum(inputs - pert, torch.tensor(0))
+    upper = torch.minimum(inputs + pert, torch.tensor(1))
+
+    return torch.flatten(lower), torch.flatten(upper)
+
+def neuron(weights, bias, lower, upper, input_dim):
+    mask = weights < 0
+    lower[mask], upper[mask] = -1 * upper[mask], -1 * lower[mask]
+    
+    return torch.dot(lower, weights) + bias, torch.dot(upper, weights) + bias
+
+def layer(l, lower, upper):
+    if type(l) == torch.nn.modules.linear.Linear:
+        weights = l.weight
+        bias = l.bias
+        input_dim = l.in_features
+        output_dim = l.out_features
+        
+        l_list = []
+        u_list = []
+        for i in range(output_dim):
+            l, u = neuron(weights[i], bias[i], lower, upper, input_dim)
+            l_list.append(l)
+            u_list.append(u)
+        
+        # print(torch.tensor(l_list).shape, torch.tensor(u_list).shape)
+        return torch.tensor(l_list), torch.tensor(u_list)
+    else:
+        return lower, upper
+
 # net: the actual network object
 # inputs: the input image specified in the test case
 # eps: the epsilon value specified in the test case
 # true_label: the true label of the input image specified in the test case
-# return: True if the network is verified, False otherwise
-# TODO Implement the analysis function
+# return: 1 if the network is verified, 0 otherwise
+# TODO: Implement the analysis function
 def analyze(net, inputs, eps, true_label):
-    # 1: put an l-infinity norm around the input image
-    # 2: produce the boxes for the input image for every neuron in the network
-    # 3: refine the boxes for every neuron in the network using the DeepPoly algorithm
-    # 4:
-    # 5:
-    # 6: check if the true label has the highest score in the corrisponding output box
-    return 0
+    # ! gradient descent on alpha 
+    # ! use backsubstitution: it maybe possible to gradually backsubstitute to prove the property already
+    lower, upper = infinty_norm(inputs, 0.01)
+    n_layers = len(net.layers)
+    for i in range(2, n_layers):
+        l = net.layers[i]
+        lower, upper = layer(l, lower, upper)
+    
+    lower = lower.tolist()
+    upper = upper.tolist()
+    tmp = [lower[true_label] - u for u in upper]
+    return min(tmp) > 0
+        
 
 
 def main():
