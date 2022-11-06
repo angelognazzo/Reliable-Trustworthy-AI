@@ -8,6 +8,10 @@ __pycache__/
 
 *.DS_Store
 *.venv/
+.DS_Store
+.venv
+.DS_Store
+.DS_Store?
 	
 # Distribution / packaging
 .Python
