@@ -64,8 +64,15 @@ def get_net(net, net_name):
 # inputs: the input image specified in the test case
 # eps: the epsilon value specified in the test case
 # true_label: the true label of the input image specified in the test case
+# return: True if the network is verified, False otherwise
 # TODO Implement the analysis function
 def analyze(net, inputs, eps, true_label):
+    # 1: put an l-infinity norm around the input image
+    # 2: produce the boxes for the input image for every neuron in the network
+    # 3: refine the boxes for every neuron in the network using the DeepPoly algorithm
+    # 4:
+    # 5:
+    # 6: check if the true label has the highest score in the corrisponding output box
     return 0
 
 
