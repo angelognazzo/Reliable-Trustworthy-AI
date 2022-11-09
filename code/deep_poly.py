@@ -117,6 +117,7 @@ class DeepPolyNetwork(torch.nn.Module):
         
         # perturb the input image passing the input through the infinity norm layer
         lower_bound, upper_bound = self.layers[0](x)
+        # save the initial lower and upper bounds
         self.lower_bounds_list.append(lower_bound)
         self.upper_bounds_list.append(upper_bound)
         
