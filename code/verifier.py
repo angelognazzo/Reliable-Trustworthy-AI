@@ -62,18 +62,38 @@ def get_net(net, net_name):
 
 # return the lower and upper bounds of the infinity norm of the input image
 def infinty_norm(inputs, pert):
+    
+    # lower = torch.clamp(inputs - pert, min=0.0).to(DEVICE)
+    # upper = torch.clamp(inputs + pert, max=1.0).to(DEVICE)
     lower = torch.maximum(inputs - pert, torch.tensor(0))
     upper = torch.minimum(inputs + pert, torch.tensor(1))
 
     return torch.flatten(lower), torch.flatten(upper)
 
-def neuron(weights, bias, lower, upper, input_dim):
+def neuron(weights, bias, lower, upper):
     mask = weights < 0
     lower[mask], upper[mask] = -1 * upper[mask], -1 * lower[mask]
     
-    return torch.dot(lower, weights) + bias, torch.dot(upper, weights) + bias
+    return torch.dot(lower, weights) + bias, torch.dot(upper, weights) + bias, bias_lower, bias_upper
 
-def layer(l, lower, upper):
+
+def relu_relaxation(lower, upper, constraint_lower, constraint_upper):
+    
+    if lower > 0 and upper > 0:
+        pass
+    elif lower < 0 and upper < 0:
+        lower = 0
+        upper = 0
+    else:
+        # TODO: implement 
+        slope = upper / (upper - lower)
+        # constraint_upper = 
+    
+
+        contraint_lower = 0
+
+
+def layer(l, lower_weights, upper_weights, lower_bias, upper_bias):
     if type(l) == torch.nn.modules.linear.Linear:
         weights = l.weight
         bias = l.bias
@@ -83,14 +103,21 @@ def layer(l, lower, upper):
         l_list = []
         u_list = []
         for i in range(output_dim):
-            l, u = neuron(weights[i], bias[i], lower, upper, input_dim)
+            l, u = neuron(weights[i], bias[i], lower_weights, upper_weights)
             l_list.append(l)
             u_list.append(u)
         
         # print(torch.tensor(l_list).shape, torch.tensor(u_list).shape)
         return torch.tensor(l_list), torch.tensor(u_list)
     else:
-        return lower, upper
+        output_dim = l.out_features
+        l_list = []
+        u_list = []
+        for i in range(output_dim):
+            l, u = relu_relaxation(lower_weights, upper_weights, lower_bias, upper_bias)
+            l_list.append(l)
+            u_list.append(u)
+        return 
 
 # net: the actual network object
 # inputs: the input image specified in the test case
@@ -99,9 +126,7 @@ def layer(l, lower, upper):
 # return: 1 if the network is verified, 0 otherwise
 # TODO: Implement the analysis function
 def analyze(net, inputs, eps, true_label):
-    # ! gradient descent on alpha 
-    # ! use backsubstitution: it maybe possible to gradually backsubstitute to prove the property already
-    lower, upper = infinty_norm(inputs, 0.01)
+    lower, upper = infinty_norm(inputs, eps)
     n_layers = len(net.layers)
     for i in range(2, n_layers):
         l = net.layers[i]
