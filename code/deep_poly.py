@@ -81,7 +81,7 @@ class DeepPolyNetwork(torch.nn.Module):
         self.layers = [InfinityNormLayer(self.eps)]
         # create a custom layer for each layer in the original network skipping the flattening and normalization layers
         for i in range(2, len(self.net.layers)):
-            l = net.layers[i]
+            l = self.net.layers[i]
             if type(l) == torch.nn.modules.linear.Linear:
                 self.layers.append(DeepPolyLinearLayer(net, l))
             elif type(l) == torch.nn.modules.activation.ReLU:
