@@ -3,6 +3,7 @@ import csv
 import torch
 import torch.nn.functional as F
 from networks import get_network, get_net_name, NormalizedResnet
+from deep_poly import DeepPolyNetwork
 
 
 DEVICE = 'cpu'
@@ -60,64 +61,6 @@ def get_net(net, net_name):
         net = NormalizedResnet(DEVICE, net)
     return net
 
-# return the lower and upper bounds of the infinity norm of the input image
-def infinty_norm(inputs, pert):
-    
-    # lower = torch.clamp(inputs - pert, min=0.0).to(DEVICE)
-    # upper = torch.clamp(inputs + pert, max=1.0).to(DEVICE)
-    lower = torch.maximum(inputs - pert, torch.tensor(0))
-    upper = torch.minimum(inputs + pert, torch.tensor(1))
-
-    return torch.flatten(lower), torch.flatten(upper)
-
-def neuron(weights, bias, lower, upper):
-    mask = weights < 0
-    lower[mask], upper[mask] = -1 * upper[mask], -1 * lower[mask]
-    
-    return torch.dot(lower, weights) + bias, torch.dot(upper, weights) + bias, bias_lower, bias_upper
-
-
-def relu_relaxation(lower, upper, constraint_lower, constraint_upper):
-    
-    if lower > 0 and upper > 0:
-        pass
-    elif lower < 0 and upper < 0:
-        lower = 0
-        upper = 0
-    else:
-        # TODO: implement 
-        slope = upper / (upper - lower)
-        # constraint_upper = 
-    
-
-        contraint_lower = 0
-
-
-def layer(l, lower_weights, upper_weights, lower_bias, upper_bias):
-    if type(l) == torch.nn.modules.linear.Linear:
-        weights = l.weight
-        bias = l.bias
-        input_dim = l.in_features
-        output_dim = l.out_features
-        
-        l_list = []
-        u_list = []
-        for i in range(output_dim):
-            l, u = neuron(weights[i], bias[i], lower_weights, upper_weights)
-            l_list.append(l)
-            u_list.append(u)
-        
-        # print(torch.tensor(l_list).shape, torch.tensor(u_list).shape)
-        return torch.tensor(l_list), torch.tensor(u_list)
-    else:
-        output_dim = l.out_features
-        l_list = []
-        u_list = []
-        for i in range(output_dim):
-            l, u = relu_relaxation(lower_weights, upper_weights, lower_bias, upper_bias)
-            l_list.append(l)
-            u_list.append(u)
-        return 
 
 # net: the actual network object
 # inputs: the input image specified in the test case
@@ -126,18 +69,18 @@ def layer(l, lower_weights, upper_weights, lower_bias, upper_bias):
 # return: 1 if the network is verified, 0 otherwise
 # TODO: Implement the analysis function
 def analyze(net, inputs, eps, true_label):
-    lower, upper = infinty_norm(inputs, eps)
-    n_layers = len(net.layers)
-    for i in range(2, n_layers):
-        l = net.layers[i]
-        lower, upper = layer(l, lower, upper)
     
-    lower = lower.tolist()
-    upper = upper.tolist()
+    # create a DeepPolyNetwork object
+    deepPolyNetwork = DeepPolyNetwork(net, inputs, eps)
+    # forward the input image through the network to create the final output bounds
+    _, lower_bounds_list, upper_bounds_list = deepPolyNetwork(inputs)
+    
+    # get the output bounds of the network (last tensor of the list) and bring it to a list
+    lower = lower_bounds_list[-1].tolist()
+    upper = upper_bounds_list[-1].tolist()
+    # check if there is an intersection between the output bounds and the true label bound
     tmp = [lower[true_label] - u for u in upper]
     return min(tmp) > 0
-        
-
 
 def main():
     parser = argparse.ArgumentParser(description='Neural network verification using DeepPoly relaxation')
