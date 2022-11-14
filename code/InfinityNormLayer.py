@@ -13,16 +13,16 @@ class InfinityNormLayer(torch.nn.Module):
         self.eps = eps
 
     def forward(self, x):
-        # lower = torch.clamp(inputs - pert, min=0.0).to(DEVICE)
-        # upper = torch.clamp(inputs + pert, max=1.0).to(DEVICE)
+        # lower = torch.clamp(x - self.eps, min=0.0)
+        # upper = torch.clamp(x + self.eps, max=1.0)
         lower = torch.maximum(x - self.eps, torch.tensor(0))
         upper = torch.minimum(x + self.eps, torch.tensor(1))
 
         if VERBOSE:
-            print("InfinityNormLayer: lower_bound shape %s, upper_bound shape %s", lower.shape, upper.shape)
+            print("InfinityNormLayer: lower_bound shape %s, upper_bound shape %s" % (lower.shape, upper.shape))
 
         assert lower.shape == upper.shape
         assert lower.shape[0] == 1
-
-        # return torch.flatten(lower), torch.flatten(upper)
+        assert (lower <= upper).all(), "InfinityNormLayer: error with the box bounds: lower > upper"
+       
         return lower, upper

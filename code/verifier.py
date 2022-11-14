@@ -3,7 +3,7 @@ import csv
 import torch
 import torch.nn.functional as F
 from networks import get_network, get_net_name, NormalizedResnet
-from deep_poly import DeepPolyNetwork
+from DeepPolyNetwork import DeepPolyNetwork
 
 
 DEVICE = 'cpu'
@@ -71,7 +71,7 @@ def get_net(net, net_name):
 def analyze(net, inputs, eps, true_label):
     
     # create a DeepPolyNetwork object
-    deepPolyNetwork = DeepPolyNetwork(net, inputs, eps)
+    deepPolyNetwork = DeepPolyNetwork(net, eps)
     # forward the input image through the network to create the final output bounds
     _, lower_bounds_list, upper_bounds_list = deepPolyNetwork(inputs)
     
