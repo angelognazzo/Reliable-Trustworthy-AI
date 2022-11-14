@@ -79,8 +79,8 @@ def analyze(net, inputs, eps, true_label):
     lower = lower_bounds_list[-1].tolist()
     upper = upper_bounds_list[-1].tolist()
     # check if there is an intersection between the output bounds and the true label bound
-    tmp = [lower[true_label] - u for u in upper]
-    return min(tmp) > 0
+    check = [lower[true_label] - u for u in upper]
+    return min(check) > 0
 
 def main():
     parser = argparse.ArgumentParser(description='Neural network verification using DeepPoly relaxation')
