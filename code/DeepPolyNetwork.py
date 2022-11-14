@@ -6,7 +6,9 @@ from settings import VERBOSE
 
 
 class DeepPolyNetwork(torch.nn.Module):
-
+    """
+    Perform a DeepPoly analysis on the given network
+    """
     def __init__(self, net, eps) -> None:
         super().__init__()
 
@@ -84,6 +86,7 @@ class DeepPolyNetwork(torch.nn.Module):
         x = self.net.layers[1](x)
         self.activation_list.append(x)
 
+        # input should be flattened
         assert x.shape[0] == 1
 
         # perturb the input image passing the input through the infinity norm layer

@@ -3,6 +3,9 @@ from settings import VERBOSE
 
 
 class DeepPolyLinearLayer(torch.nn.Module):
+    """
+    Class implementing the LinearLayer of the DeepPoly algorithm
+    """
 
     def __init__(self, net, layer) -> None:
         super().__init__()

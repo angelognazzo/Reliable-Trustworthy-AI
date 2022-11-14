@@ -1,8 +1,12 @@
 import torch
 from settings import VERBOSE
 
-# return the lower and upper bounds of the infinity norm of the input image
+
 class InfinityNormLayer(torch.nn.Module):
+    """
+    Class implementing the LinearLayer of the DeepPoly algorithm
+    Return the lower and upper bounds of the infinity norm of the input image
+    """
 
     def __init__(self, eps) -> None:
         super().__init__()
