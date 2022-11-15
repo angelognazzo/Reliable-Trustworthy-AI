@@ -11,8 +11,10 @@ class DeepPolyLinearLayer(torch.nn.Module):
         super().__init__()
         self.net = net
         self.layer = layer
-        self.weights = layer.weight
-        self.bias = layer.bias
+        # we want 784x50 and not the opposite
+        self.weights = layer.weight.t()
+        # we want 1x50 and not the opposite
+        self.bias = layer.bias.reshape(1, -1)
 
     # swap the bounds depending on the sign of the weight
     # return new lower and upper bounds
@@ -33,11 +35,9 @@ class DeepPolyLinearLayer(torch.nn.Module):
         negative_weights = torch.mul(negative_mask, weights)
         positive_weights = torch.mul(positive_mask, weights)
 
-        new_lower_bound = torch.matmul(upper_bound, negative_weights.t(
-        )) + torch.matmul(lower_bound, positive_weights.t()) + bias
+        new_lower_bound = torch.matmul(upper_bound, negative_weights) + torch.matmul(lower_bound, positive_weights) + bias
 
-        new_upper_bound = torch.matmul(lower_bound, negative_weights.t(
-        )) + torch.matmul(upper_bound, positive_weights.t()) + bias
+        new_upper_bound = torch.matmul(lower_bound, negative_weights) + torch.matmul(upper_bound, positive_weights) + bias
 
 
         if VERBOSE:

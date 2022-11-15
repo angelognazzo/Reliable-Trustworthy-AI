@@ -68,19 +68,25 @@ def get_net(net, net_name):
 # true_label: the true label of the input image specified in the test case
 # return: 1 if the network is verified, 0 otherwise
 # TODO: Implement the analysis function
-def analyze(net, inputs, eps, true_label):
-    
+def analyze(net, inputs, eps, true_label):    
     # create a DeepPolyNetwork object
     deepPolyNetwork = DeepPolyNetwork(net, eps)
     # forward the input image through the network to create the final output bounds
     _, lower_bounds_list, upper_bounds_list = deepPolyNetwork(inputs)
+
     
     # get the output bounds of the network (last tensor of the list) and bring it to a list
-    lower = lower_bounds_list[-1].tolist()
-    upper = upper_bounds_list[-1].tolist()
+    lower = lower_bounds_list[-1].tolist()[0]
+    upper = upper_bounds_list[-1].tolist()[0]
+    
+    # print(true_label)
+    # print((lower))
+    # print((upper))
     # check if there is an intersection between the output bounds and the true label bound
-    check = [lower[true_label] - u for u in upper]
-    return min(check) > 0
+    counter = 0
+    for u in upper:
+        counter += int((lower[true_label] > u))
+    return counter == 9
 
 def main():
     parser = argparse.ArgumentParser(description='Neural network verification using DeepPoly relaxation')
