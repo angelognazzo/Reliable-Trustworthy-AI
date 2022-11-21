@@ -2,6 +2,7 @@ import torch
 from InfinityNormLayer import InfinityNormLayer
 from DeepPolyLinearLayer import DeepPolyLinearLayer
 from DeepPolyReluLayer import DeepPolyReluLayer
+from DeepPolyConvolutionalLayer import DeepPolyConvolutionalLayer
 from settings import VERBOSE
 
 
@@ -17,13 +18,20 @@ class DeepPolyNetwork(torch.nn.Module):
 
         self.layers = [InfinityNormLayer(self.eps)]
         # create a custom layer for each layer in the original network skipping the flattening and normalization layers
-        for i in range(2, len(self.net.layers)):
+        # print(self.net.layers)
+        for i in range(1, len(self.net.layers)):
             l = self.net.layers[i]
-            # TODO: add the convolution layer 
+            
+            # skip the flattening layer
+            if type(l) == torch.nn.modules.flatten.Flatten:
+                continue
+            
             if type(l) == torch.nn.modules.linear.Linear:
                 self.layers.append(DeepPolyLinearLayer(net, l))
             elif type(l) == torch.nn.modules.activation.ReLU:
                 self.layers.append(DeepPolyReluLayer(l))
+            elif type(l) == torch.nn.modules.Conv2d:
+                self.layers.append(DeepPolyConvolutionalLayer(l))
             else:
                 print("DeepPolyNetwork constructor ERROR: layer type not supported")
 
@@ -49,6 +57,7 @@ class DeepPolyNetwork(torch.nn.Module):
         upper_weights = torch.eye(input_size)
         upper_bias = torch.zeros(1, input_size)
 
+        # ! TODO: use torch.where instead of for loops
         # iterate through the layers in reverse order starting from the second to last layer (penultimum) to and excluding the first layer (InfinityNormLayer)
         for i in range(current_layer, 0, -1):
 
@@ -81,22 +90,30 @@ class DeepPolyNetwork(torch.nn.Module):
         return new_lower_bound, new_upper_bound
 
     def forward(self, x):
+        print(x.shape)
         # perturb the input image passing the input through the infinity norm layer
         lower_bound, upper_bound = self.layers[0](x)
         
         # normalize and flatten the input image
         lower_bound = self.net.layers[0](lower_bound)
-        lower_bound = self.net.layers[1](lower_bound)
         upper_bound = self.net.layers[0](upper_bound)
-        upper_bound = self.net.layers[1](upper_bound)
+        
+        if type(self.net.layers[1]) == torch.nn.modules.flatten.Flatten:
+            lower_bound = self.net.layers[1](lower_bound)
+            upper_bound = self.net.layers[1](upper_bound)
+        
         # save the initial lower and upper bounds
         self.lower_bounds_list.append(lower_bound)
         self.upper_bounds_list.append(upper_bound)
        
         # pass x through the flatten and normalization layers
         x = self.net.layers[0](x)
-        x = self.net.layers[1](x)
+        if type(self.net.layers[1]) == torch.nn.modules.flatten.Flatten:
+            x = self.net.layers[1](x)
         self.activation_list.append(x)
+        
+        # print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+        # print(x.shape)
         
         # input should be flattened and dimensions should be the same
         assert x.shape[0] == 1
@@ -121,7 +138,7 @@ class DeepPolyNetwork(torch.nn.Module):
             assert x.shape == lower_bound.shape == upper_bound.shape, "DeepPolyNetwork forward: input shape mismatch after forward pass for layer %s" % (i)
             
             # if l is a linear layer, perform backsubstitution
-            if type(l) == DeepPolyLinearLayer and i > 1:
+            if type(l) == DeepPolyLinearLayer and i > 1 and False:
             # TODO: why it doesn't work for also the linear layer?
             # if i > 1:
                 if VERBOSE:
