@@ -24,13 +24,6 @@ class DeepPolyReluLayer(torch.nn.Module):
         
         # compute the relu on the input
         x = self.layer(x)
-        
-        # lower_to_return = torch.zeros_like(lower)
-        # upper_to_return = torch.zeros_like(upper)
-        # self.lower_weights = torch.zeros(lower.shape[1], lower.shape[1])
-        # self.upper_weights = torch.zeros(lower.shape[1], lower.shape[1])
-        # self.lower_bias = torch.zeros_like(lower)
-        # self.upper_bias = torch.zeros_like(upper)
 
         # TODO: use torch.where instead of for loops
         # all the points are negative
@@ -63,6 +56,7 @@ class DeepPolyReluLayer(torch.nn.Module):
         self.upper_bias = torch.where((lower < 0) & (upper > 0), torch.mul(slope, lower), torch.zeros_like(lower))
         
         
+        # TODO: this diag should not always be here. FIX IT
         self.lower_weights=torch.diag(lower_w)
         self.upper_weights=torch.diag(upper_w)
 
@@ -73,6 +67,22 @@ class DeepPolyReluLayer(torch.nn.Module):
         
         
         return x, lower, upper
+    
+        # old implementation
+        if VERBOSE:
+            print("DeepPolyReluLayer forward: lower shape %s, upper shape %s" % (str(lower.shape), str(upper.shape)))
+        
+        assert lower.shape == upper.shape, "DeepPolyReluLayer forward: lower and upper bounds have different shapes"
+        
+        # compute the relu on the input
+        x = self.layer(x)
+        
+        lower_to_return = torch.zeros_like(lower)
+        upper_to_return = torch.zeros_like(upper)
+        self.lower_weights = torch.zeros(lower.shape[1], lower.shape[1])
+        self.upper_weights = torch.zeros(lower.shape[1], lower.shape[1])
+        self.lower_bias = torch.zeros_like(lower)
+        self.upper_bias = torch.zeros_like(upper)
         
         for i in range(lower.shape[1]):
             

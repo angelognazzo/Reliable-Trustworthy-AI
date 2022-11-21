@@ -13,9 +13,6 @@ class DeepPolyConvolutionalLayer(torch.nn.Module):
         self.layer = layer
         self.weights = layer.weight
         
-        print("@@@@@@@@@@@@@@@")
-        print(self.weights.shape)
-        
         # The bias is a 1D tensor, we want to reshape it to a 2D tensor??? TODO: check this
         self.bias = layer.bias
         
@@ -26,6 +23,8 @@ class DeepPolyConvolutionalLayer(torch.nn.Module):
             print("DeepPolyConvolutionalLayer: weights shape: %s, bias shape %s, stride %s, %s padding" % (
                 str(self.weights.shape), str(self.bias.shape), str(self.stride), str(self.padding)))
 
+    # swap the bounds depending on the sign of the weights
+    # return new lower and upper bounds
     @staticmethod
     def swap_and_forward(lower_bound, upper_bound, weights, bias, stride, padding):
         negative_mask = (weights < 0).int()

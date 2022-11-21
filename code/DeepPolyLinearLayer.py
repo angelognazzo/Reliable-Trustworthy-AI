@@ -16,18 +16,10 @@ class DeepPolyLinearLayer(torch.nn.Module):
         # we want 1x50 and not the opposite
         self.bias = layer.bias.reshape(1, -1)
 
-    # swap the bounds depending on the sign of the weight
+    # swap the bounds depending on the sign of the weights
     # return new lower and upper bounds
     @staticmethod
     def swap_and_forward(lower_bound, upper_bound, weights, bias):
-        # mask = weights < 0
-        # lower_bound = lower_bound.expand(mask.shape[0], -1)
-        # upper_bound = upper_bound.expand(mask.shape[0], -1)
-        # assert lower_bound.shape == upper_bound.shape == mask.shape
-        # lower_bound[mask], upper_bound[mask] = - 1 * upper_bound[mask], -1 * lower_bound[mask]
-
-        # new_lower_bound = torch.matmul(lower_bound, weights) + bias
-        # new_upper_bound = torch.matmul(upper_bound, weights) + bias
         
         negative_mask = (weights < 0).int()
         positive_mask = (weights >= 0).int()
