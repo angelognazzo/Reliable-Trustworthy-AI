@@ -44,7 +44,7 @@ class DeepPolyReluLayer(torch.nn.Module):
         
         # in between
         alpha = 1.0
-        slope = torch.where((upper-lower) != 0, torch.div(upper, upper-lower), torch.zeros_like(upper))
+        slope = torch.where((upper - lower) != 0, torch.div(upper, upper-lower), torch.zeros_like(upper))
         lower = torch.where((lower < 0) & (upper > 0), alpha*lower, lower)
         upper = torch.where((lower < 0) & (upper > 0), torch.mul(slope, upper), upper)
         lower_w = torch.where((lower < 0) & (upper > 0), alpha * torch.ones_like(lower_w), lower_w)
@@ -65,7 +65,7 @@ class DeepPolyReluLayer(torch.nn.Module):
         
         return x, lower, upper
     
-        # old implementation
+        # old implementation with for loop, much more clear but slower
         if VERBOSE:
             print("DeepPolyReluLayer forward: lower shape %s, upper shape %s" % (str(lower.shape), str(upper.shape)))
         
