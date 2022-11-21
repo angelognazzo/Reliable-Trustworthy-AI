@@ -65,7 +65,7 @@ class DeepPolyReluLayer(torch.nn.Module):
         
         return x, lower, upper
     
-        # old implementation with for loop, much more clear but slower
+        # old implementation with for loop, much more clear but slower (it works only with 1D tensors (MLPs))
         if VERBOSE:
             print("DeepPolyReluLayer forward: lower shape %s, upper shape %s" % (str(lower.shape), str(upper.shape)))
         
