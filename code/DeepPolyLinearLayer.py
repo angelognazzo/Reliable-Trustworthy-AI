@@ -41,14 +41,15 @@ class DeepPolyLinearLayer(torch.nn.Module):
         return new_lower_bound, new_upper_bound
 
     # forward pass through the network
-    def forward(self, x, lower_bound, upper_bound):
+    def forward(self, x, lower_bound, upper_bound, input_shape):
         new_lower_bound, new_upper_bound = self.swap_and_forward(
             lower_bound, upper_bound, self.weights, self.bias)
         x = self.layer(x)
+        input_shape = x.shape
         
         if VERBOSE:
             print("DeepPolyLinearLayer: x shape %s" % (str(x.shape)))
 
         assert new_lower_bound.shape[0] == x.shape[0]
 
-        return x, new_lower_bound, new_upper_bound
+        return x, new_lower_bound, new_upper_bound, input_shape
