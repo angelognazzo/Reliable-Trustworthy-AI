@@ -38,6 +38,8 @@ class DeepPolyReluLayer(torch.nn.Module):
             l = lower[0, i]
             u = upper[0, i]
 
+            assert l <= u
+            
             # all the points are negative
             if u <= 0:
                 if VERBOSE:
@@ -50,7 +52,7 @@ class DeepPolyReluLayer(torch.nn.Module):
                 if VERBOSE:
                     pass
                     # print("DeepPolyReluLayer forward: all the points are positive")
-                lower_to_return[0, i] = u
+                lower_to_return[0, i] = l
                 upper_to_return[0, i] = u
                 self.lower_weights[i, i] = 1
                 self.upper_weights[i, i] = 1

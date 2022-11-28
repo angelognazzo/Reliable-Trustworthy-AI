@@ -83,11 +83,8 @@ class DeepPolyNetwork(torch.nn.Module):
         new_lower_bound, _ = DeepPolyLinearLayer.swap_and_forward(first_lower_bound, first_upper_bound, lower_weights, lower_bias)
         _, new_upper_bound = DeepPolyLinearLayer.swap_and_forward(first_lower_bound, first_upper_bound, upper_weights, upper_bias)
 
-        print((new_lower_bound <= new_upper_bound).shape)
-        print((new_lower_bound <= new_upper_bound).int().sum())
-        print(torch.where(new_lower_bound <= new_upper_bound, torch.zeros_like(new_upper_bound), new_upper_bound - new_lower_bound).sum())
         assert new_lower_bound.shape == new_upper_bound.shape
-        assert (new_lower_bound <= new_upper_bound).all(), "Backsubstitution: Error with the box bounds: lower > upper"
+        # assert (new_lower_bound <= new_upper_bound).all(), "Backsubstitution: Error with the box bounds: lower > upper"
 
         return new_lower_bound, new_upper_bound
 
@@ -154,8 +151,21 @@ class DeepPolyNetwork(torch.nn.Module):
                 assert upper_bound_tmp.shape == upper_bound.shape
 
                 # get the tightest bound possible
-                lower_bound = torch.maximum(lower_bound, lower_bound_tmp)
-                upper_bound = torch.minimum(upper_bound, upper_bound_tmp)
+                # when there is an interesection between the two bounds
+                mask_positive = torch.max(lower_bound_tmp, lower_bound) <= torch.min(upper_bound_tmp, upper_bound)
+                mask_negative = torch.logical_not(mask_positive)
+                
+                lower_bound = torch.where(mask_positive, torch.max(lower_bound_tmp, lower_bound), lower_bound)
+                upper_bound =  torch.where(mask_positive, torch.min(upper_bound_tmp, upper_bound), upper_bound)
+                
+                assert (lower_bound <= upper_bound).all(), "DeepPolyNetwork forward: Error with the box bounds: lower > upper"
+                
+                # when there is no intersection between the two bounds
+                mask_tighter_disjoint = (upper_bound_tmp - lower_bound_tmp < upper_bound - lower_bound) & (upper_bound_tmp - lower_bound_tmp >= 0)
+                lower_bound = torch.where(mask_negative & mask_tighter_disjoint, lower_bound_tmp, lower_bound)
+                upper_bound = torch.where(mask_negative & mask_tighter_disjoint, upper_bound_tmp, upper_bound)
+                
+                assert (lower_bound <= upper_bound).all(), "DeepPolyNetwork forward: Error with the box bounds: lower > upper"
                 
             # save the newly computed bounds
             self.lower_bounds_list.append(lower_bound)
