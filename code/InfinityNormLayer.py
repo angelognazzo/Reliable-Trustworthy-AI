@@ -13,8 +13,7 @@ class InfinityNormLayer(torch.nn.Module):
         self.eps = eps
 
     def forward(self, x):
-        # lower = torch.clamp(x - self.eps, min=0.0)
-        # upper = torch.clamp(x + self.eps, max=1.0)
+        # perturb the input, making sure not to go below or above 0 (pixels are defined between 0 and 1)
         lower = torch.maximum(x - self.eps, torch.tensor(0))
         upper = torch.minimum(x + self.eps, torch.tensor(1))
 

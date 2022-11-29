@@ -23,7 +23,7 @@ class DeepPolyReluLayer(torch.nn.Module):
 
         assert lower.shape == upper.shape, "DeepPolyReluLayer forward: lower and upper bounds have different shapes"
 
-        # compute the relu on the input
+        # compute the relu on the actual input
         x = self.layer(x)
 
         lower_to_return = torch.zeros_like(lower)
@@ -37,10 +37,9 @@ class DeepPolyReluLayer(torch.nn.Module):
 
             l = lower[0, i]
             u = upper[0, i]
-
-            assert l <= u
             
-            # all the points are negative
+            # all the points are negative, everything is clipped to zero
+            # since weights are already inzitialized at 0 (see above) we don't have to do anything
             if u <= 0:
                 if VERBOSE:
                     pass

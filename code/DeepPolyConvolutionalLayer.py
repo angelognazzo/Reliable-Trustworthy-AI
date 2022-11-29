@@ -14,7 +14,6 @@ class DeepPolyConvolutionalLayer(torch.nn.Module):
         self.kernel = layer.weight
         self.weights = None 
         
-        # The bias is a 1D tensor, we want to reshape it to a 2D tensor??? TODO: check this
         self.bias_kernel = layer.bias
         self.bias = None
         
@@ -49,10 +48,6 @@ class DeepPolyConvolutionalLayer(torch.nn.Module):
     
     
     def forward(self, x, lower_bound, upper_bound, input_shape):
-        # out_height = (input_shape[2] + 2 * self.padding[1] - self.kernel.shape[2]) // self.stride[1] + 1
-        # out_width = (input_shape[1] + 2 * self.padding[0] - self.kernel.shape[1]) // self.stride[0] + 1
-        # self.output_shape = (1, self.kernel_shape[0], out_height, out_width)
-        
         # x, lower_bound and upper_bound are flattened (i.e. [1, 3072]), we want to reshape them to being a tensor so that we can perfrom the convolutions(i.e [1, 3, 32, 32])
         x = x.reshape(input_shape)
         lower_bound = lower_bound.reshape(input_shape)
@@ -62,6 +57,7 @@ class DeepPolyConvolutionalLayer(torch.nn.Module):
             print("DeepPolyConvolutionalLayer RESHAPE: x shape %s, lower_bound shape %s, upper_bound shape %s" % (
                 str(x.shape), str(lower_bound.shape), str(upper_bound.shape)))
         
+        # perform forward of the DeepPoly convolutional layer
         lower_bound, upper_bound = self.swap_and_forward(
             lower_bound, upper_bound, self.kernel, self.bias_kernel, self.stride, self.padding)
         
@@ -69,6 +65,7 @@ class DeepPolyConvolutionalLayer(torch.nn.Module):
             print("DeepPolyConvolutionalLayer: x shape %s, lower_bound shape %s, upper_bound shape %s" % (
                 str(x.shape), str(lower_bound.shape), str(upper_bound.shape)))
         
+        # perform convolution on the actual input
         x = self.layer(x)
 
         # weight matrix is of shape [n_elemnts_input, n_elements_output]
@@ -136,9 +133,6 @@ class DeepPolyConvolutionalLayer(torch.nn.Module):
 
         #                         self.weights[int(position_in_column), index_weights_column] = self.kernel[channel_z_input, out_z, y_shift, x_shift]
         
-        #################################################################
-        #################################################################
-        #################################################################
         w = torch.eye(input_shape.numel()).view(list(input_shape) + [input_shape.numel()])
         w = w.permute(0, 1, 4, 2, 3)
 
@@ -151,10 +145,6 @@ class DeepPolyConvolutionalLayer(torch.nn.Module):
 
         b = torch.ones(w.shape[:-1]) * self.bias_kernel[:, None, None]
         self.bias = torch.flatten(b)
-
-        #################################################################
-        #################################################################
-        #################################################################
         
         input_shape = x.shape
         x = x.flatten(start_dim=1, end_dim=-1)

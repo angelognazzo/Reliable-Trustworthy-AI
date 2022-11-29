@@ -18,7 +18,7 @@ class DeepPolyNetwork(torch.nn.Module):
 
         self.layers = [InfinityNormLayer(self.eps)]
        
-        # create a custom layer for each layer in the original network skipping the flattening and normalization layers (self.net[0] and self.net[1])
+        # create a custom layer for each layer in the original network skipping the normalization layer (self.net[1])
         for i in range(1, len(self.net.layers)):
             l = self.net.layers[i]
             
@@ -48,7 +48,6 @@ class DeepPolyNetwork(torch.nn.Module):
 
     # perform backsubstitution to compute tighter lower and upper bounds
     def backsubstitution(self, current_layer, input_size):
-
         # get the first bounds
         first_lower_bound = self.lower_bounds_list[0]
         first_upper_bound = self.upper_bounds_list[0]
@@ -59,7 +58,7 @@ class DeepPolyNetwork(torch.nn.Module):
         upper_bias = torch.zeros(1, input_size)
 
         # ! TODO: use torch.where instead of for loops
-        # iterate through the layers in reverse order starting from the second to last layer (penultimum) to and excluding the first layer (InfinityNormLayer)
+        # iterate through the layers in reverse order starting from the layer before the current_layer to and excluding the first layer (InfinityNormLayer)
         for i in range(current_layer, 0, -1):
 
             if VERBOSE:
@@ -68,7 +67,9 @@ class DeepPolyNetwork(torch.nn.Module):
             # get the current layer and its type
             layer = self.layers[i]
             layer_type = type(layer) == DeepPolyReluLayer
-            # if a linear layer is encountered get the actual weights and bias of the layer, else use the computed weight bounds
+            
+            # if a linear layer or convolutional is encountered get the actual weights and bias of the layer,
+            # else (RELU layer) use the computed weight bounds
             upper_weights_tmp = layer.upper_weights if layer_type else layer.weights
             upper_bias_tmp = layer.upper_bias if layer_type else layer.bias
             lower_weights_tmp = layer.lower_weights if layer_type else layer.weights
@@ -90,32 +91,20 @@ class DeepPolyNetwork(torch.nn.Module):
 
     def forward(self, x):
         # perturb the input image passing the input through the infinity norm custom layer
-
         lower_bound, upper_bound = self.layers[0](x)
         input_shape = x.shape
         
-        # normalize the input image
+        # normalize the input image and flatten
         lower_bound = self.net.layers[0](lower_bound).flatten().reshape(1, -1)
         upper_bound = self.net.layers[0](upper_bound).flatten().reshape(1, -1)
 
-        
-        # if the first layer is a Flatten layer, the execute it
-        # this check is necessary because in MLPs we have a Flatten layer, but not in CNNs
-        if type(self.net.layers[1]) == torch.nn.modules.flatten.Flatten:
-            lower_bound = self.net.layers[1](lower_bound)
-            upper_bound = self.net.layers[1](upper_bound)
-        
         # save the initial lower and upper bounds
         self.lower_bounds_list.append(lower_bound)
         self.upper_bounds_list.append(upper_bound)
        
-        # pass x through normalization layers
+        # pass x through normalization layers and flatten
         x = self.net.layers[0](x)
         x = x.flatten().reshape(1, -1)
-        
-        # same check as above
-        if type(self.net.layers[1]) == torch.nn.modules.flatten.Flatten:
-            x = self.net.layers[1](x)
         self.activation_list.append(x)
         
         # input dimensions should be the same even after our transformations
@@ -139,32 +128,41 @@ class DeepPolyNetwork(torch.nn.Module):
                 print("DeepPolyNetwork forward: shape after layer %s: x: %s, lower bound %s, upper bound %s" % (i + 1, x.shape, lower_bound.shape, upper_bound.shape))
             assert x.shape == lower_bound.shape == upper_bound.shape, "DeepPolyNetwork forward: input shape mismatch after forward pass for layer %s" % (i)
             
-            # if l not a RELU layer, perform backsubstitution
+            # if l not a RELU layer and we are at least at the second layer: perform backsubstitution
             if (type(l) == DeepPolyLinearLayer or type(l) == DeepPolyConvolutionalLayer) and i > 1:
                 if VERBOSE:
                     print("DeepPolyNetwork: Performing backsubstitution")
                 
+                # perform backsubstitution
                 lower_bound_tmp, upper_bound_tmp = self.backsubstitution(i, x.shape[1])
                 
-                
+                # dimensions should be preserved after backsubstitution
                 assert lower_bound_tmp.shape == lower_bound.shape
                 assert upper_bound_tmp.shape == upper_bound.shape
 
-                # get the tightest bound possible
-                # when there is an interesection between the two bounds
+                # get the tightest bounds possible
+                # lower_bound and lower_bound_tmp could or couldn't have an interesection
+                # EASY CASE: there is an interesection between the two bounds:
+                # check the intersection condition
                 mask_positive = torch.max(lower_bound_tmp, lower_bound) <= torch.min(upper_bound_tmp, upper_bound)
                 mask_negative = torch.logical_not(mask_positive)
-                
+                # if there is an intersection, the bounds can be tighten by taking the greatest maximum and the smallest minimum 
                 lower_bound = torch.where(mask_positive, torch.max(lower_bound_tmp, lower_bound), lower_bound)
                 upper_bound =  torch.where(mask_positive, torch.min(upper_bound_tmp, upper_bound), upper_bound)
                 
                 assert (lower_bound <= upper_bound).all(), "DeepPolyNetwork forward: Error with the box bounds: lower > upper"
                 
-                # when there is no intersection between the two bounds
+                # there is no intersection between the two bounds, bounds are therefore 'disjoint'
+                # check if the new bounds are tighter than the old ones and if upper_bound_tmp > lower_bound_tmp.
+                # This (upper_bound_tmp > lower_bound_tmp) could happen during backsubstitution where upper_bound_tmp
+                # and lower_bound_tmp are computed using two different calls to the 'swap_and_forward' function 
+                # and therefore it's possible that in some cases the correct order is not preserved
                 mask_tighter_disjoint = (upper_bound_tmp - lower_bound_tmp < upper_bound - lower_bound) & (upper_bound_tmp - lower_bound_tmp >= 0)
+                # use also mask_negative to update the entries that haven't been updated above
                 lower_bound = torch.where(mask_negative & mask_tighter_disjoint, lower_bound_tmp, lower_bound)
                 upper_bound = torch.where(mask_negative & mask_tighter_disjoint, upper_bound_tmp, upper_bound)
                 
+                # the correct order now should be respected
                 assert (lower_bound <= upper_bound).all(), "DeepPolyNetwork forward: Error with the box bounds: lower > upper"
                 
             # save the newly computed bounds
@@ -175,6 +173,9 @@ class DeepPolyNetwork(torch.nn.Module):
         if VERBOSE:
             print("DeepPolyNetwork: Forward pass completed")
 
+        # number of lower and upper bounds should be the same
         assert len(self.lower_bounds_list) == len(self.upper_bounds_list), "DeepPolyNetwork forward pass completed: Error: number of lower bounds != number of upper bounds"
-
+        # the correct order now should be respected
+        assert (lower_bound <= upper_bound).all(), "DeepPolyNetwork forward pass completed: Error with the box bounds: lower > upper"
+        
         return x, self.lower_bounds_list, self.upper_bounds_list
