@@ -62,6 +62,7 @@ class DeepPolyNetwork(torch.nn.Module):
             
             # skip the flattening layer and the normalization.
             # These layers are not present in every network, For example in CNNs and ResNets. That's why this check is necessary
+            # we dont want to create a custom layer for these layers, we just resuse the torch implementation
             if type(l) == torch.nn.modules.flatten.Flatten or type(l) == torch.nn.modules.normalization.LayerNorm:
                 continue
             
@@ -75,7 +76,7 @@ class DeepPolyNetwork(torch.nn.Module):
             elif type(l) == resnet.BasicBlock:
                 self.layers.append(DeepPolyResnetBlock(l))
             else:
-                print("DeepPolyNetwork constructor ERROR: layer type not supported")
+                raise Exception("DeepPolyNetwork constructor ERROR: layer type not supported")
 
         if VERBOSE:
             print("DeepPolyNetwork: Created %s layers (Infinity norm layer included)" % (len(self.layers)))
@@ -143,7 +144,7 @@ class DeepPolyNetwork(torch.nn.Module):
         self.upper_bounds_list.append(upper_bound)
        
         # pass x through normalization layers and flatten
-        x = self.normalization_layer[0](x)
+        x = self.normalization_layer(x)
         x = x.flatten().reshape(1, -1)
         self.activation_list.append(x)
         
