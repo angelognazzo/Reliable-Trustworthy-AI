@@ -1,4 +1,3 @@
-
 import torch
 from settings import VERBOSE
 import torch.nn.functional as F

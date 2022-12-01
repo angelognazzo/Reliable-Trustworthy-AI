@@ -3,7 +3,10 @@ from InfinityNormLayer import InfinityNormLayer
 from DeepPolyLinearLayer import DeepPolyLinearLayer
 from DeepPolyReluLayer import DeepPolyReluLayer
 from DeepPolyConvolutionalLayer import DeepPolyConvolutionalLayer
+from DeepPolyResnetBlock import DeepPolyResnetBlock
 from settings import VERBOSE
+import networks
+import resnet
 
 
 class DeepPolyNetwork(torch.nn.Module):
@@ -15,15 +18,51 @@ class DeepPolyNetwork(torch.nn.Module):
 
         self.eps = eps
         self.net = net
-
+        
+        # contains the custom layers of the network
         self.layers = [InfinityNormLayer(self.eps)]
-       
-        # create a custom layer for each layer in the original network skipping the normalization layer (self.net[1])
-        for i in range(1, len(self.net.layers)):
-            l = self.net.layers[i]
+        
+        # parse the network to understand which layers to create
+        # in case of a resnet, parsing is more complicated because layers are nested in blocks
+        layers_to_create = []
+        if type(self.net == networks.NormalizedResnet):
             
-            # skip the flattening layer. This layer is not present in every network, For example in CNNs. That's why this check is necessary
-            if type(l) == torch.nn.modules.flatten.Flatten:
+            # get the correct normalization layer
+            self.normalization_layer = self.net.normalization
+            #  get the actual resnet from the 'normalized resnet' object
+            self.net = self.net.resnet
+            
+            # get all the layers of the resnet
+            l = list(self.net.modules())
+            i = 1
+            while i < len(l):
+                
+                module = l[i]
+                # we don't care about sequentials blocks. go to the next layer
+                if type(module) == torch.nn.modules.Sequential:
+                    i += 1
+                    continue
+                # append the current layer
+                layers_to_create.append(module)
+                
+                # if the current layer is of type 'BasicBlock' I want to get the layer as a whole and skip
+                # all the layers inside the block
+                if type(module) == resnet.BasicBlock:
+                    i += len(module.path_a) + len(module.path_b) + 2 + 1
+                else:
+                    i += 1
+        # in case of a normal network, parsing is easier, just get the correct field
+        else:
+            layers_to_create = self.net.layers
+            self.normalization_layer = layers_to_create[0]
+       
+        # create a custom layer for each layer in the original network
+        for i in range(0, len(layers_to_create)):
+            l = layers_to_create[i]
+            
+            # skip the flattening layer and the normalization.
+            # These layers are not present in every network, For example in CNNs and ResNets. That's why this check is necessary
+            if type(l) == torch.nn.modules.flatten.Flatten or type(l) == torch.nn.modules.normalization.LayerNorm:
                 continue
             
             # create a custom layer based on the type of the original layer
@@ -33,6 +72,8 @@ class DeepPolyNetwork(torch.nn.Module):
                 self.layers.append(DeepPolyReluLayer(l))
             elif type(l) == torch.nn.modules.Conv2d:
                 self.layers.append(DeepPolyConvolutionalLayer(l))
+            elif type(l) == resnet.BasicBlock:
+                self.layers.append(DeepPolyResnetBlock(l))
             else:
                 print("DeepPolyNetwork constructor ERROR: layer type not supported")
 
@@ -40,7 +81,6 @@ class DeepPolyNetwork(torch.nn.Module):
             print("DeepPolyNetwork: Created %s layers (Infinity norm layer included)" % (len(self.layers)))
 
         assert len(self.layers) > 0, "DeepPolyNetwork constructor: no layers created"
-        assert len(self.layers) == len(self.net.layers) - 1, "DeepPolyNetwork constructor: number of layers mismatch compared to the original network"
 
         self.lower_bounds_list = []
         self.upper_bounds_list = []
@@ -95,15 +135,15 @@ class DeepPolyNetwork(torch.nn.Module):
         input_shape = x.shape
         
         # normalize the input image and flatten
-        lower_bound = self.net.layers[0](lower_bound).flatten().reshape(1, -1)
-        upper_bound = self.net.layers[0](upper_bound).flatten().reshape(1, -1)
+        lower_bound = self.normalization_layer(lower_bound).flatten().reshape(1, -1)
+        upper_bound = self.normalization_layer(upper_bound).flatten().reshape(1, -1)
 
         # save the initial lower and upper bounds
         self.lower_bounds_list.append(lower_bound)
         self.upper_bounds_list.append(upper_bound)
        
         # pass x through normalization layers and flatten
-        x = self.net.layers[0](x)
+        x = self.normalization_layer[0](x)
         x = x.flatten().reshape(1, -1)
         self.activation_list.append(x)
         
