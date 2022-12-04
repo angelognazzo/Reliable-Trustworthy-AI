@@ -48,7 +48,14 @@ class DeepPolyResnetBlock(torch.nn.Module):
         for layer in self.path_b:
            x_b, lower_bound_b, upper_bound_b, input_shape_b = layer(x_b, lower_bound_b, upper_bound_b, input_shape_b)
            
-        
+        assert x_a.shape == x_b.shape, "DeepPolyResnetBlock forward: the two paths have different shapes of input"
+        # sum the two paths
+        new_lower_bound = torch.add(lower_bound_a, lower_bound_b)
+        new_upper_bound = torch.add(upper_bound_a, upper_bound_b) 
+        new_x = torch.add(x_a, x_b)
         # TODO 
         # AGGREGATE RESULTS FOR X AND BOUNDS
         # COMPUTE WEIGHTS AND BIAS
+        #self.weights=
+        #self.bias
+        return new_x, new_lower_bound, new_upper_bound, input_shape_a
