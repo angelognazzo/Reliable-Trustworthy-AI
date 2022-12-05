@@ -122,7 +122,7 @@ class DeepPolyReluLayer(torch.nn.Module):
         self.upper_bias = torch.where(lower >= 0, 0, 0)
         
         # in between
-        alpha = 2
+        alpha = 1
         tmp = alpha * torch.ones_like(lower_w)
         tmp = tmp.type(torch.float)
         print(tmp)

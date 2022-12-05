@@ -79,6 +79,9 @@ def analyze(net, inputs, eps, true_label):
     lower = lower_bounds_list[-1].tolist()[0]
     upper = upper_bounds_list[-1].tolist()[0]
     
+    print(true_label)
+    print(lower)
+    print(upper)
     # check if there is an intersection between the output bounds and the true label bound
     counter = 0
     for u in upper:

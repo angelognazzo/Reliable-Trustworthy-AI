@@ -5,6 +5,7 @@ from DeepPolyReluLayer import DeepPolyReluLayer
 from DeepPolyConvolutionalLayer import DeepPolyConvolutionalLayer
 from DeepPolyResnetBlock import DeepPolyResnetBlock
 from settings import VERBOSE
+from utils import tight_bounds
 import networks
 import resnet
 
@@ -25,13 +26,13 @@ class DeepPolyNetwork(torch.nn.Module):
         # parse the network to understand which layers to create
         # in case of a resnet, parsing is more complicated because layers are nested in blocks
         layers_to_create = []
-        if type(self.net == networks.NormalizedResnet):
+        if type(self.net) == networks.NormalizedResnet:
             
             # get the correct normalization layer
             self.normalization_layer = self.net.normalization
             #  get the actual resnet from the 'normalized resnet' object
             self.net = self.net.resnet
-            
+
             # get all the layers of the resnet
             l = list(self.net.modules())
             i = 1
@@ -63,9 +64,8 @@ class DeepPolyNetwork(torch.nn.Module):
             # skip the flattening layer and the normalization.
             # These layers are not present in every network, For example in CNNs and ResNets. That's why this check is necessary
             # we dont want to create a custom layer for these layers, we just resuse the torch implementation
-            if type(l) == torch.nn.modules.flatten.Flatten or type(l) == torch.nn.modules.normalization.LayerNorm:
+            if type(l) == torch.nn.modules.flatten.Flatten or type(l) == networks.Normalization:
                 continue
-            
             # create a custom layer based on the type of the original layer
             if type(l) == torch.nn.modules.linear.Linear:
                 self.layers.append(DeepPolyLinearLayer(net, l))
@@ -107,7 +107,7 @@ class DeepPolyNetwork(torch.nn.Module):
                 
             # get the current layer and its type
             layer = self.layers[i]
-            layer_type = type(layer) == DeepPolyReluLayer
+            layer_type = type(layer) == DeepPolyReluLayer or type(layer) == DeepPolyResnetBlock
             
             # if a linear layer or convolutional is encountered get the actual weights and bias of the layer,
             # else (RELU layer) use the computed weight bounds
@@ -181,27 +181,8 @@ class DeepPolyNetwork(torch.nn.Module):
                 assert lower_bound_tmp.shape == lower_bound.shape
                 assert upper_bound_tmp.shape == upper_bound.shape
 
-                # get the tightest bounds possible
-                # lower_bound and lower_bound_tmp could or couldn't have an interesection
-                # EASY CASE: there is an interesection between the two bounds:
-                # check the intersection condition
-                mask_positive = torch.max(lower_bound_tmp, lower_bound) <= torch.min(upper_bound_tmp, upper_bound)
-                mask_negative = torch.logical_not(mask_positive)
-                # if there is an intersection, the bounds can be tighten by taking the greatest maximum and the smallest minimum 
-                lower_bound = torch.where(mask_positive, torch.max(lower_bound_tmp, lower_bound), lower_bound)
-                upper_bound =  torch.where(mask_positive, torch.min(upper_bound_tmp, upper_bound), upper_bound)
-                
-                assert (lower_bound <= upper_bound).all(), "DeepPolyNetwork forward: Error with the box bounds: lower > upper"
-                
-                # there is no intersection between the two bounds, bounds are therefore 'disjoint'
-                # check if the new bounds are tighter than the old ones and if upper_bound_tmp > lower_bound_tmp.
-                # This (upper_bound_tmp > lower_bound_tmp) could happen during backsubstitution where upper_bound_tmp
-                # and lower_bound_tmp are computed using two different calls to the 'swap_and_forward' function 
-                # and therefore it's possible that in some cases the correct order is not preserved
-                mask_tighter_disjoint = (upper_bound_tmp - lower_bound_tmp < upper_bound - lower_bound) & (upper_bound_tmp - lower_bound_tmp >= 0)
-                # use also mask_negative to update the entries that haven't been updated above
-                lower_bound = torch.where(mask_negative & mask_tighter_disjoint, lower_bound_tmp, lower_bound)
-                upper_bound = torch.where(mask_negative & mask_tighter_disjoint, upper_bound_tmp, upper_bound)
+                # update the lower and upper bounds
+                lower_bound, upper_bound = tight_bounds(lower_bound, upper_bound, lower_bound_tmp, upper_bound_tmp)
                 
                 # the correct order now should be respected
                 assert (lower_bound <= upper_bound).all(), "DeepPolyNetwork forward: Error with the box bounds: lower > upper"

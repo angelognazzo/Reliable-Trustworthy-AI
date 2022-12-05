@@ -1,0 +1,20 @@
+net_1,img1_0.0500.txt,3 verified        OK
+net_1,img2_0.0550.txt,0 verified        OK
+net_2,img1_0.2400.txt,1 verified        OK
+net_2,img2_0.2360.txt,9 not verified    NOT OK (alpha=0)
+net_3,img1_0.0065.txt,6 not verified    OK 
+net_3,img2_0.0081.txt,4 not verified    NOT OK (alpha=2.42 > 0 NOT POSSIBLE)
+net_4,img1_0.2240.txt,9 verified        OK
+net_4,img2_0.2290.txt,7 not verified    OK
+net_5,img1_0.0260.txt,7 verified        OK
+net_5,img2_0.0470.txt,7 verified        OK
+net_6,img1_0.0140.txt,6  not verified   NOT OK (alpha=0.42)
+net_6,img2_0.0147.txt,3 not verified    OK
+net_7,img1_0.0540.txt,7  verified       OK
+net_7,img2_0.1440.txt,9 not verified    OK
+net_8,img1_0.0096.txt,0 not verified    NOT OK
+net_8,img2_0.0100.txt,0 not verified    OK
+net_9,img1_0.0040.txt,
+net_9,img2_0.0040.txt,
+net_10,img1_0.0014.txt,3 not verified   NOT OK
+net_10,img2_0.0015.txt,7 not verified   NOT OK

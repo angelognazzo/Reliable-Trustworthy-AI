@@ -60,13 +60,13 @@ class DeepPolyConvolutionalLayer(torch.nn.Module):
         lower_bound, upper_bound = self.swap_and_forward(
             lower_bound, upper_bound, self.kernel, self.bias_kernel, self.stride, self.padding)
         
-        if VERBOSE:
-            print("DeepPolyConvolutionalLayer: x shape %s, lower_bound shape %s, upper_bound shape %s" % (
-                str(x.shape), str(lower_bound.shape), str(upper_bound.shape)))
-        
         # perform convolution on the actual input
         x = self.layer(x)
 
+        if VERBOSE:
+            print("DeepPolyConvolutionalLayer: x shape %s, lower_bound shape %s, upper_bound shape %s" % (
+                str(x.shape), str(lower_bound.shape), str(upper_bound.shape)))
+            
         # weight matrix is of shape [n_elemnts_input, n_elements_output]
         # self.weights = torch.zeros([input_shape.numel(), x.shape.numel()])
         # print(self.weights.shape)
