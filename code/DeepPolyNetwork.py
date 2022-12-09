@@ -6,6 +6,7 @@ from DeepPolyConvolutionalLayer import DeepPolyConvolutionalLayer
 from DeepPolyResnetBlock import DeepPolyResnetBlock
 from settings import VERBOSE
 from utils import tight_bounds
+from backsubstitution import backsubstitution
 import networks
 import resnet
 
@@ -32,7 +33,7 @@ class DeepPolyNetwork(torch.nn.Module):
             self.normalization_layer = self.net.normalization
             #  get the actual resnet from the 'normalized resnet' object
             self.net = self.net.resnet
-
+            print(self.net)
             # get all the layers of the resnet
             l = list(self.net.modules())
             i = 1
@@ -74,7 +75,7 @@ class DeepPolyNetwork(torch.nn.Module):
             elif type(l) == torch.nn.modules.Conv2d:
                 self.layers.append(DeepPolyConvolutionalLayer(l))
             elif type(l) == resnet.BasicBlock:
-                self.layers.append(DeepPolyResnetBlock(l))
+                self.layers.append(DeepPolyResnetBlock(l, self.layers[0:]))
             else:
                 raise Exception("DeepPolyNetwork constructor ERROR: layer type not supported")
 
@@ -87,49 +88,7 @@ class DeepPolyNetwork(torch.nn.Module):
         self.upper_bounds_list = []
         self.activation_list = []
 
-    # perform backsubstitution to compute tighter lower and upper bounds
-    def backsubstitution(self, current_layer, input_size):
-        # get the first bounds
-        first_lower_bound = self.lower_bounds_list[0]
-        first_upper_bound = self.upper_bounds_list[0]
-        # initialize new lower and upper weights
-        lower_weights = torch.eye(input_size)
-        lower_bias = torch.zeros(1, input_size)
-        upper_weights = torch.eye(input_size)
-        upper_bias = torch.zeros(1, input_size)
-
-        # ! TODO: use torch.where instead of for loops
-        # iterate through the layers in reverse order starting from the layer before the current_layer to and excluding the first layer (InfinityNormLayer)
-        for i in range(current_layer, 0, -1):
-
-            if VERBOSE:
-                print("Backsubstitution Loop: layer %s out of %s layers" % (i, current_layer))
-                
-            # get the current layer and its type
-            layer = self.layers[i]
-            layer_type = type(layer) == DeepPolyReluLayer or type(layer) == DeepPolyResnetBlock
-            
-            # if a linear layer or convolutional is encountered get the actual weights and bias of the layer,
-            # else (RELU layer) use the computed weight bounds
-            upper_weights_tmp = layer.upper_weights if layer_type else layer.weights
-            upper_bias_tmp = layer.upper_bias if layer_type else layer.bias
-            lower_weights_tmp = layer.lower_weights if layer_type else layer.weights
-            lower_bias_tmp = layer.lower_bias if layer_type else layer.bias
-
-            upper_bias += torch.matmul(upper_bias_tmp, upper_weights)
-            lower_bias += torch.matmul(lower_bias_tmp, lower_weights)
-            upper_weights = torch.matmul(upper_weights_tmp, upper_weights)
-            lower_weights = torch.matmul(lower_weights_tmp, lower_weights)
-
-        # perform a new forward pass with the new weights to compute the new lower and upper bounds
-        new_lower_bound, _ = DeepPolyLinearLayer.swap_and_forward(first_lower_bound, first_upper_bound, lower_weights, lower_bias)
-        _, new_upper_bound = DeepPolyLinearLayer.swap_and_forward(first_lower_bound, first_upper_bound, upper_weights, upper_bias)
-
-        assert new_lower_bound.shape == new_upper_bound.shape
-        # assert (new_lower_bound <= new_upper_bound).all(), "Backsubstitution: Error with the box bounds: lower > upper"
-
-        return new_lower_bound, new_upper_bound
-
+   
     def forward(self, x):
         # perturb the input image passing the input through the infinity norm custom layer
         lower_bound, upper_bound = self.layers[0](x)
@@ -163,7 +122,11 @@ class DeepPolyNetwork(torch.nn.Module):
                 print("DeepPolyNetwork: Forward pass for layer %s of type %s, out of %s layers" % (i + 1, type(l), len(self.layers)))
 
             # ! perform the FORWARD pass for the current layer
-            x, lower_bound, upper_bound, input_shape = l(x, lower_bound, upper_bound, input_shape)
+            if type(l) == DeepPolyResnetBlock:
+                  x, lower_bound, upper_bound, input_shape = l(x, lower_bound, upper_bound, input_shape, self.lower_bounds_list[0], self.upper_bounds_list[0])
+            else:
+                  x, lower_bound, upper_bound, input_shape = l(x, lower_bound, upper_bound, input_shape)
+          
             
             if VERBOSE:
                 print("DeepPolyNetwork forward: shape after layer %s: x: %s, lower bound %s, upper bound %s" % (i + 1, x.shape, lower_bound.shape, upper_bound.shape))
@@ -175,7 +138,7 @@ class DeepPolyNetwork(torch.nn.Module):
                     print("DeepPolyNetwork: Performing backsubstitution")
                 
                 # perform backsubstitution
-                lower_bound_tmp, upper_bound_tmp = self.backsubstitution(i, x.shape[1])
+                lower_bound_tmp, upper_bound_tmp = backsubstitution(self.layers, i, x.shape[1], self.lower_bounds_list[0], self.upper_bounds_list[0])
                 
                 # dimensions should be preserved after backsubstitution
                 assert lower_bound_tmp.shape == lower_bound.shape

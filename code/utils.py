@@ -1,4 +1,5 @@
 import torch
+from DeepPolyReluLayer import DeepPolyReluLayer
 
 def tight_bounds(lower_bound, upper_bound, lower_bound_tmp, upper_bound_tmp):
     # get the tightest bounds possible

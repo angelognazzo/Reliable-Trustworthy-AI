@@ -63,7 +63,7 @@ class DeepPolyReluLayer(torch.nn.Module):
                     # print("DeepPolyReluLayer forward: some points are negative and some are positive")
 
                 # TODO: optimize alpha with gradient descent
-                alpha = 1
+                alpha = 0.5
                 self.lower_weights[i, i] = alpha
                 slope = u / (u - l)
                 self.upper_weights[i, i] = slope
