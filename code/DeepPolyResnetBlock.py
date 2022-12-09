@@ -13,7 +13,7 @@ class DeepPolyResnetBlock(torch.nn.Module):
     Class implementing the ResNet block of the DeepPoly algorithm
     """
     
-    # create a list of layers from the path
+    # create a list of custom layers from the path
     def parse_paths(self, path):
         path = list(path)
         layers = []
@@ -40,50 +40,54 @@ class DeepPolyResnetBlock(torch.nn.Module):
         self.prev_layers = prev_layers
     
     def backsubstitute(self, layers, i, x, current_lower_bound, current_upper_bound, first_lower_bound, first_upper_bound):
-        l = layers[i]
             
         if VERBOSE:
-            print("DeepPolyNetwork: Performing backsubstitution")
+            print("Resnet Block: Performing backsubstitution")
 
-        # perform backsubstitution
+        # perform backsubstitution all the way to the begining of the NETWORK
         lower_bound_tmp, upper_bound_tmp = backsubstitution(layers, i, x.shape[1], first_lower_bound, first_upper_bound)
 
         # dimensions should be preserved after backsubstitution
         assert lower_bound_tmp.shape == current_lower_bound.shape
         assert upper_bound_tmp.shape == current_upper_bound.shape
 
-        # update the lower and upper bounds
+        # tighten the bounds
         lower_bound_tighten, upper_bound_tighten = tight_bounds(
             current_lower_bound, current_upper_bound, lower_bound_tmp, upper_bound_tmp)
 
-        # the correct order now should be respected
+        # the correct order should be respected
         assert (lower_bound_tighten <= upper_bound_tighten).all(
         ), "DeepPolyNetwork forward: Error with the box bounds: lower > upper"
         
         return lower_bound_tighten, upper_bound_tighten
         
-    
-
         
     def forward(self, x, lower_bound, upper_bound, input_shape, first_lower_bound, first_upper_bound):
-        # compute the forward of the first path
+        
+        # compute the forward of path_a
         if VERBOSE:
             print("Forward pass: path a")
         x_a, lower_bound_a, upper_bound_a, input_shape_a = torch.clone(x), torch.clone(lower_bound), torch.clone(upper_bound), input_shape
+        # we need to compute the backsubstitution to the begining of the NETWORK, therefore we need to know which layers come before
         previous_layers_a = self.prev_layers + self.path_a
         for i, layer in enumerate(self.path_a):
+            # forward pass of current layer of path_a
             x_a, lower_bound_a, upper_bound_a, input_shape_a = layer(x_a, lower_bound_a, upper_bound_a, input_shape_a)
+            # perform backsubstitution all the way to the begining of the NETWORK if needed
             if (type(layer) == DeepPolyLinearLayer or type(layer) == DeepPolyConvolutionalLayer) and i > 1:
                 lower_bound_a, upper_bound_a = self.backsubstitute(previous_layers_a, i + len(self.prev_layers), x_a, lower_bound_a, upper_bound_a, first_lower_bound, first_upper_bound)
             
        
-        # compute the forward of the second path
+        # compute the forward of path_b
         if VERBOSE:
             print("Forward pass: path b")
         x_b, lower_bound_b, upper_bound_b, input_shape_b = torch.clone(x), torch.clone(lower_bound), torch.clone(upper_bound), input_shape
+        # we need to compute the backsubstitution to the begining of the NETWORK, therefore we need to know which layers come before
         previous_layers_b = self.prev_layers + self.path_b
         for i, layer in enumerate(self.path_b):
+            # forward pass of current layer of path_b
             x_b, lower_bound_b, upper_bound_b, input_shape_b = layer(x_b, lower_bound_b, upper_bound_b, input_shape_b)
+            #  perform backsubstitution all the way to the begining of the NETWORK if needed
             if (type(layer) == DeepPolyLinearLayer or type(layer) == DeepPolyConvolutionalLayer) and i > 1:
                 lower_bound_b, upper_bound_b = self.backsubstitute(previous_layers_b, i + len(self.prev_layers), x_b, lower_bound_b, upper_bound_b, first_lower_bound, first_upper_bound)
        

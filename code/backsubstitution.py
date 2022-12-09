@@ -6,6 +6,9 @@ from InfinityNormLayer import InfinityNormLayer
 from DeepPolyConvolutionalLayer import DeepPolyConvolutionalLayer
 from DeepPolyIdentityLayer import DeepPolyIdentityLayer
 
+"""
+This file contains all the functions needed to perform backsubstitution
+"""
 # helper function of handle_backsubstitution_resnet_block
 def compute_new_weights_and_bias(layers, starting_lower_weights, starting_upper_weights, starting_lower_bias, starting_upper_bias):
 
@@ -33,7 +36,8 @@ def compute_new_weights_and_bias(layers, starting_lower_weights, starting_upper_
 
     return lower_weights, upper_weights, lower_bias, upper_bias
 
-
+# handle the backsubstitution for a resnet block
+# find the new weight matrix multiplying the weight matrices of the two path separately
 def handle_backsubstitution_resnet_block(resnet_block, lower_weights, upper_weights, lower_bias, upper_bias):
 
     lower_weights_a, upper_weights_a, lower_bias_a, upper_bias_a = compute_new_weights_and_bias(
@@ -49,7 +53,6 @@ def handle_backsubstitution_resnet_block(resnet_block, lower_weights, upper_weig
     return lower_weights, upper_weights, lower_bias, upper_bias
 
 # perform backsubstitution to compute tighter lower and upper bounds
-# TODO: make this function completely independent of the DeepPolyNetwork class so that it can be reused in ResnetBlock
 def backsubstitution(layers, current_layer, input_size, first_lower_bound, first_upper_bound):    
     # initialize new lower and upper weights
     lower_weights = torch.eye(input_size)
@@ -69,13 +72,14 @@ def backsubstitution(layers, current_layer, input_size, first_lower_bound, first
         if type(layer) == InfinityNormLayer:
             continue
         
+        # check if the current layer is a resnet block (cannot do type(layer) == ResnetBlock because of circular import)
         isDeepPolyResenetBlock = not (type(layer) == DeepPolyLinearLayer or type(
             layer) == DeepPolyConvolutionalLayer or type(layer) == DeepPolyIdentityLayer or type(layer) == DeepPolyReluLayer)
         
         # if a linear layer or convolutional is encountered get the actual weights and bias of the layer,
         # if a RELU layer is encountered use the computed weight bounds
         # if a resnet block is encountered, skip-it, this case will be handled by the if statement below, 
-        # because if the previous layer is a resnet block, then we need to be careful abous the bias, in the sens that we don't want
+        # because if the previous layer is a resnet block, then we need to be careful abous the bias, in the sense that we don't want
         # to add it twice
         if isDeepPolyResenetBlock:
             continue 
@@ -96,6 +100,7 @@ def backsubstitution(layers, current_layer, input_size, first_lower_bound, first
         upper_weights = torch.matmul(upper_weights_tmp, upper_weights)
         lower_weights = torch.matmul(lower_weights_tmp, lower_weights)
         
+        # if the previous layer is a resnet block we handle this case manually bacause we need to be careful about the bias
         isDeepPolyResenetBlock = not (type(layers[i-1]) == DeepPolyLinearLayer or type(layers[i-1]) == DeepPolyConvolutionalLayer or type(
             layers[i-1]) == DeepPolyIdentityLayer or type(layers[i-1]) == DeepPolyReluLayer or type(layers[i-1]) == InfinityNormLayer)
         if i > 0 and isDeepPolyResenetBlock:

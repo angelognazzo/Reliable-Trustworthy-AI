@@ -122,6 +122,7 @@ class DeepPolyNetwork(torch.nn.Module):
                 print("DeepPolyNetwork: Forward pass for layer %s of type %s, out of %s layers" % (i + 1, type(l), len(self.layers)))
 
             # ! perform the FORWARD pass for the current layer
+            # DeepPolyResnetBlock needs more parameters than the other layers (because it needs to perform backsubstitution by itself)
             if type(l) == DeepPolyResnetBlock:
                   x, lower_bound, upper_bound, input_shape = l(x, lower_bound, upper_bound, input_shape, self.lower_bounds_list[0], self.upper_bounds_list[0])
             else:
