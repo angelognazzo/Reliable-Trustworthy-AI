@@ -2,6 +2,10 @@ import torch
 from DeepPolyReluLayer import DeepPolyReluLayer
 
 def tight_bounds(lower_bound, upper_bound, lower_bound_tmp, upper_bound_tmp):
+    assert (lower_bound <= upper_bound).all(
+    ), "DeepPolyNetwork forward: Error with the box bounds: lower > upper"
+
+
     # get the tightest bounds possible
     # lower_bound and lower_bound_tmp could or couldn't have an interesection
     # EASY CASE: there is an interesection between the two bounds:
