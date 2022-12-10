@@ -134,7 +134,7 @@ class DeepPolyNetwork(torch.nn.Module):
             assert x.shape == lower_bound.shape == upper_bound.shape, "DeepPolyNetwork forward: input shape mismatch after forward pass for layer %s" % (i)
             
             # if l not a RELU layer and we are at least at the second layer: perform backsubstitution
-            if (type(l) == DeepPolyLinearLayer or type(l) == DeepPolyConvolutionalLayer) and i > 1:
+            if (type(l) == DeepPolyLinearLayer or type(l) == DeepPolyConvolutionalLayer or type(l) == DeepPolyResnetBlock) and i > 1:
                 if VERBOSE:
                     print("DeepPolyNetwork: Performing backsubstitution")
                 

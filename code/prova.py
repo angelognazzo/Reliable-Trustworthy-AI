@@ -1,25 +1,13 @@
 import torch
 
-input_shape = [1, 1, 4, 4]
-a = torch.eye(16)
-b = a.view(input_shape + [16])
-b = b.permute(0, 1, 4, 2, 3)
-print(b)
-kernel = torch.randn([1, 1, 3,3])
-# print(kernel)
+W_a = torch.rand(10, 10)
+W_b = torch.rand(10, 10)
 
-print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-print("Input shape: " + str(input_shape))
-print("Output shape: ")
-print("kernel shape: " + str(kernel.shape))
-print("W shape: " + str(b.shape))
+W = W_a + W_b
 
-w = torch.conv3d(b, kernel.unsqueeze(
-    2), stride=(1, 1, 1)).permute(0, 1, 3, 4, 2)
-# print(w)
-print("After Convolutional: " + str(w.shape))
-# print(w)
-w = w[0]
-weights = w.reshape(16, 4).t()
-# print(weights)
-# print(weights.shape)
+lower = torch.rand(10, 1)
+
+tmp1 = torch.matmul(W_a, lower) + torch.matmul(W_b, lower)
+tmp2 = torch.matmul(W, lower)
+
+

@@ -18,7 +18,6 @@ class DeepPolyResnetBlock(torch.nn.Module):
         path = list(path)
         layers = []
         for p in path:
-            print(type(p))
             if type(p) == torch.nn.modules.Conv2d:
                 layers.append(DeepPolyConvolutionalLayer(p))
             elif type(p) == torch.nn.modules.activation.ReLU:
@@ -76,7 +75,7 @@ class DeepPolyResnetBlock(torch.nn.Module):
             # perform backsubstitution all the way to the begining of the NETWORK if needed
             if (type(layer) == DeepPolyLinearLayer or type(layer) == DeepPolyConvolutionalLayer) and i > 1:
                 lower_bound_a, upper_bound_a = self.backsubstitute(previous_layers_a, i + len(self.prev_layers), x_a, lower_bound_a, upper_bound_a, first_lower_bound, first_upper_bound)
-            
+   
        
         # compute the forward of path_b
         if VERBOSE:
@@ -99,6 +98,7 @@ class DeepPolyResnetBlock(torch.nn.Module):
         new_x = x_a + x_b
         new_lower_bound = lower_bound_a + lower_bound_b
         new_upper_bound = upper_bound_a + upper_bound_b
+        
         
         return new_x, new_lower_bound, new_upper_bound, input_shape_a
        
