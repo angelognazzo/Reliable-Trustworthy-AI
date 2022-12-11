@@ -15,8 +15,8 @@ def compute_new_weights_and_bias(layers, starting_lower_weights, starting_upper_
     upper_bias = torch.zeros(starting_upper_bias.shape)
     lower_weights = torch.clone(starting_lower_weights)
     upper_weights = torch.clone(starting_upper_weights)
-    print(range(len(layers) - 1, -1, -1))
-    for i in range(len(layers) - 1, 0, -1): #range(len(layers) - 1, -1, -1)
+    
+    for i in range(len(layers) - 1, -1, -1): #range(len(layers) - 1, -1, -1)
         print("iterazione numero OOOOOOOOOO: ", i)
         
         layer = layers[i]
@@ -27,22 +27,55 @@ def compute_new_weights_and_bias(layers, starting_lower_weights, starting_upper_
         if isDeepPolyResenetBlock:
             res_lower_weights, res_upper_weights, res_lower_bias, res_upper_bias = handle_backsubstitution_resnet_block(
                 layer, lower_weights, upper_weights, lower_bias, upper_bias) # guarda input and recursive call
+            
+            # prova senza ricorsione
+            
+            
+            """lower_weights_a = torch.eye(max(lower_bias.shape[0], lower_bias.shape[1]))
+            lower_bias_a = torch.zeros_like(lower_bias)
+            upper_weights_a = torch.eye(max(upper_bias.shape[0], upper_bias.shape[1]))
+            upper_bias_a = torch.zeros_like(upper_bias)
+
+            for i in range(len(layer.path_a) - 1, -1, -1):
+                layer_inside = layer.path_a[i]
+                layer_type_inside = type(layer_inside) == DeepPolyReluLayer
+
+                # if a linear layer or convolutional is encountered get the actual weights and bias of the layer,
+                # else (RELU layer) use the computed weight bounds
+                upper_weights_tmp_a = layer.path_a.upper_weights if layer_type_inside else layer.path_a.weights
+                upper_bias_tmp_a = layer.path_a.upper_bias if layer_type_inside else layer.path_a.bias
+                lower_weights_tmp_a = layer.path_a.lower_weights if layer_type_inside else layer.path_a.weights
+                lower_bias_tmp_a = layer.path_a.lower_bias if layer_type_inside else layer.path_a.bias
+
+                upper_bias_a += torch.matmul(upper_bias_tmp_a, upper_weights_a)
+                lower_bias_a += torch.matmul(lower_bias_tmp_a, lower_weights_a)
+                upper_weights_a = torch.matmul(upper_weights_tmp_a, upper_weights_a)
+                lower_weights_a = torch.matmul(lower_weights_tmp_a, lower_weights_a)
+
+            # manca for b
+            
+            res_lower_weights=lower_weights_a#+lower_weights_b
+            res_upper_weights=upper_weights_a#+upper_weights_b
+            res_lower_bias=lower_bias_a#+lower_bias_b
+            res_upper_bias=upper_bias_a#+upper_bias_b"""
+                
+            
             upper_weights_tmp=res_upper_weights
-            upper_bias_tmp=torch.squeeze(res_upper_bias)
+            upper_bias_tmp=res_upper_bias# torch.squeeze(res_upper_bias)
             lower_weights_tmp=res_lower_weights
-            lower_bias_tmp=torch.squeeze(res_lower_bias)
+            lower_bias_tmp=res_lower_bias#torch.squeeze(res_lower_bias)
         elif type(layer) == DeepPolyReluLayer:
             upper_weights_tmp = layer.upper_weights
-            upper_bias_tmp = torch.squeeze(layer.upper_bias)
+            upper_bias_tmp = layer.upper_bias#torch.squeeze(layer.upper_bias)
             """print("RELUUUUUUUUU")
             print(upper_bias_tmp.shape)"""
             lower_weights_tmp = layer.lower_weights
-            lower_bias_tmp = torch.squeeze(layer.lower_bias)
+            lower_bias_tmp = layer.lower_bias#torch.squeeze(layer.lower_bias)
         else:
             upper_weights_tmp = layer.weights
-            upper_bias_tmp = torch.squeeze(layer.bias)
+            upper_bias_tmp = layer.bias#torch.squeeze(layer.bias)
             lower_weights_tmp = layer.weights
-            lower_bias_tmp = torch.squeeze(layer.bias)
+            lower_bias_tmp = layer.bias#torch.squeeze(layer.bias)
 
         print("ZOCA DI WEIGHTS: originali")
         print(upper_weights.shape)
@@ -64,45 +97,8 @@ def compute_new_weights_and_bias(layers, starting_lower_weights, starting_upper_
         upper_weights = torch.matmul(upper_weights_tmp, upper_weights)
         lower_weights = torch.matmul(lower_weights_tmp, lower_weights)
     
-    print("FUORI DAL LOOOOOP")
-    layer = layers[0]
-        
-    print(type(layer))
-    isDeepPolyResenetBlock = not (type(layer) == DeepPolyLinearLayer or type(
-            layer) == DeepPolyConvolutionalLayer or type(layer) == DeepPolyIdentityLayer or type(layer) == DeepPolyReluLayer)
-    if isDeepPolyResenetBlock:
-        res_lower_weights, res_upper_weights, res_lower_bias, res_upper_bias = handle_backsubstitution_resnet_block(
-                layer, lower_weights, upper_weights, lower_bias, upper_bias) # guarda input and recursive call
-        upper_weights_tmp=res_upper_weights
-        upper_bias_tmp=torch.squeeze(res_upper_bias)
-        lower_weights_tmp=res_lower_weights
-        lower_bias_tmp=torch.squeeze(res_lower_bias)
-    elif type(layer) == DeepPolyReluLayer:
-        upper_weights_tmp = layer.upper_weights
-        upper_bias_tmp = torch.squeeze(layer.upper_bias)
-        """print("RELUUUUUUUUU")
-        print(upper_bias_tmp.shape)"""
-        lower_weights_tmp = layer.lower_weights
-        lower_bias_tmp = torch.squeeze(layer.lower_bias)
-    else:
-        upper_weights_tmp = layer.weights
-        upper_bias_tmp = torch.squeeze(layer.bias)
-        lower_weights_tmp = layer.weights
-        lower_bias_tmp = torch.squeeze(layer.bias)
+    
 
-    print("ZOCA DI WEIGHTS: originali")
-    print(upper_weights.shape)
-    print("ZOCA DI WEIGHTS: tmp")
-    print(upper_weights_tmp.shape)
-    print(" VECCHIO BIAS")
-    print(upper_bias.shape)
-    print("NUOVO BIAS")
-    print(upper_bias_tmp.shape)    
-
-    upper_bias += torch.matmul(upper_bias_tmp, upper_weights)
-    lower_bias += torch.matmul(lower_bias_tmp, lower_weights)
-    upper_weights = torch.matmul(upper_weights_tmp, upper_weights)
-    lower_weights = torch.matmul(lower_weights_tmp, lower_weights)
 
     return lower_weights, upper_weights, lower_bias, upper_bias
 

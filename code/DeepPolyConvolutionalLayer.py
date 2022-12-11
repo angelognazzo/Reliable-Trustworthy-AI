@@ -143,7 +143,7 @@ class DeepPolyConvolutionalLayer(torch.nn.Module):
         self.weights = torch.flatten(w, start_dim=0, end_dim=2).t()
 
         b = torch.ones(w.shape[:-1]) * self.bias_kernel[:, None, None]
-        self.bias = torch.flatten(b)
+        self.bias = torch.flatten(b).reshape(1,-1) # qua stai attento
         
         input_shape = x.shape
         x = x.flatten(start_dim=1, end_dim=-1)
