@@ -25,28 +25,31 @@ def compute_new_weights_and_bias(layers, starting_lower_weights, starting_upper_
         isDeepPolyResenetBlock = not (type(layer) == DeepPolyLinearLayer or type(
             layer) == DeepPolyConvolutionalLayer or type(layer) == DeepPolyIdentityLayer or type(layer) == DeepPolyReluLayer)
         if isDeepPolyResenetBlock:
-            res_lower_weights, res_upper_weights, res_lower_bias, res_upper_bias = handle_backsubstitution_resnet_block(
-                layer, lower_weights, upper_weights, lower_bias, upper_bias) # guarda input and recursive call
+            #res_lower_weights, res_upper_weights, res_lower_bias, res_upper_bias = handle_backsubstitution_resnet_block(
+            #    layer, lower_weights, upper_weights, lower_bias, upper_bias) # guarda input and recursive call
             
             # prova senza ricorsione
             
-            
-            """lower_weights_a = torch.eye(max(lower_bias.shape[0], lower_bias.shape[1]))
+            print("AOOOOOOOOOOOOOOOO")
+            print(layer.path_a)
+            lower_weights_a = torch.clone(lower_weights)#torch.eye(max(lower_bias.shape[0], lower_bias.shape[1]))
             lower_bias_a = torch.zeros_like(lower_bias)
-            upper_weights_a = torch.eye(max(upper_bias.shape[0], upper_bias.shape[1]))
+            upper_weights_a = torch.clone(upper_weights)#torch.eye(max(upper_bias.shape[0], upper_bias.shape[1]))
             upper_bias_a = torch.zeros_like(upper_bias)
-
+            
+            print(lower_weights_a.shape)
             for i in range(len(layer.path_a) - 1, -1, -1):
+                print("iterazione numero A: ", i)
                 layer_inside = layer.path_a[i]
                 layer_type_inside = type(layer_inside) == DeepPolyReluLayer
-
+                print(type(layer_inside))
                 # if a linear layer or convolutional is encountered get the actual weights and bias of the layer,
                 # else (RELU layer) use the computed weight bounds
-                upper_weights_tmp_a = layer.path_a.upper_weights if layer_type_inside else layer.path_a.weights
-                upper_bias_tmp_a = layer.path_a.upper_bias if layer_type_inside else layer.path_a.bias
-                lower_weights_tmp_a = layer.path_a.lower_weights if layer_type_inside else layer.path_a.weights
-                lower_bias_tmp_a = layer.path_a.lower_bias if layer_type_inside else layer.path_a.bias
-
+                upper_weights_tmp_a = layer_inside.upper_weights if layer_type_inside else layer_inside.weights
+                upper_bias_tmp_a = layer_inside.upper_bias if layer_type_inside else layer_inside.bias
+                lower_weights_tmp_a = layer_inside.lower_weights if layer_type_inside else layer_inside.weights
+                lower_bias_tmp_a = layer_inside.lower_bias if layer_type_inside else layer_inside.bias
+                
                 upper_bias_a += torch.matmul(upper_bias_tmp_a, upper_weights_a)
                 lower_bias_a += torch.matmul(lower_bias_tmp_a, lower_weights_a)
                 upper_weights_a = torch.matmul(upper_weights_tmp_a, upper_weights_a)
@@ -57,8 +60,9 @@ def compute_new_weights_and_bias(layers, starting_lower_weights, starting_upper_
             res_lower_weights=lower_weights_a#+lower_weights_b
             res_upper_weights=upper_weights_a#+upper_weights_b
             res_lower_bias=lower_bias_a#+lower_bias_b
-            res_upper_bias=upper_bias_a#+upper_bias_b"""
-                
+            res_upper_bias=upper_bias_a#+upper_bias_b
+            print("problema qui con quello che esce di bias da identity layer")
+            print(res_upper_bias.shape)
             
             upper_weights_tmp=res_upper_weights
             upper_bias_tmp=res_upper_bias# torch.squeeze(res_upper_bias)
