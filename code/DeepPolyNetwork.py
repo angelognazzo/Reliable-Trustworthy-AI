@@ -5,10 +5,11 @@ from DeepPolyReluLayer import DeepPolyReluLayer
 from DeepPolyConvolutionalLayer import DeepPolyConvolutionalLayer
 from DeepPolyResnetBlock import DeepPolyResnetBlock
 from settings import VERBOSE
-from utils import tight_bounds
+from utils import tight_bounds, compute_out_dimension
 from backsubstitution import backsubstitution
 import networks
 import resnet
+import math
 
 
 class DeepPolyNetwork(torch.nn.Module):
@@ -32,6 +33,7 @@ class DeepPolyNetwork(torch.nn.Module):
             # get the correct normalization layer
             self.normalization_layer = self.net.normalization
             #  get the actual resnet from the 'normalized resnet' object
+            dataset = self.net.dataset
             self.net = self.net.resnet
             print(self.net)
             # get all the layers of the resnet
@@ -55,9 +57,17 @@ class DeepPolyNetwork(torch.nn.Module):
                     i += 1
         # in case of a normal network, parsing is easier, just get the correct field
         else:
+            dataset = self.net.dataset
             layers_to_create = self.net.layers
             self.normalization_layer = layers_to_create[0]
-       
+
+        if dataset == 'mnist':
+            out_dimension = (1, 28, 28)
+        elif dataset == 'cifar10':
+            out_dimension = (3, 32, 32)
+        else:
+            raise("DeepPolyNetwork constructor ERROR: dataset not supported")
+        
         # create a custom layer for each layer in the original network
         for i in range(0, len(layers_to_create)):
             l = layers_to_create[i]
@@ -67,17 +77,21 @@ class DeepPolyNetwork(torch.nn.Module):
             # we dont want to create a custom layer for these layers, we just resuse the torch implementation
             if type(l) == torch.nn.modules.flatten.Flatten or type(l) == networks.Normalization:
                 continue
+            
+            out_dimension_tmp = compute_out_dimension(out_dimension, l)
             # create a custom layer based on the type of the original layer
             if type(l) == torch.nn.modules.linear.Linear:
                 self.layers.append(DeepPolyLinearLayer(net, l))
             elif type(l) == torch.nn.modules.activation.ReLU:
-                self.layers.append(DeepPolyReluLayer(l))
+                self.layers.append(DeepPolyReluLayer(l, out_dimension_tmp))
             elif type(l) == torch.nn.modules.Conv2d:
                 self.layers.append(DeepPolyConvolutionalLayer(l))
             elif type(l) == resnet.BasicBlock:
-                self.layers.append(DeepPolyResnetBlock(l, self.layers[0:]))
+                self.layers.append(DeepPolyResnetBlock(l, self.layers[0:], out_dimension))
             else:
                 raise Exception("DeepPolyNetwork constructor ERROR: layer type not supported")
+            
+            out_dimension = out_dimension_tmp
 
         if VERBOSE:
             print("DeepPolyNetwork: Created %s layers (Infinity norm layer included)" % (len(self.layers)))
@@ -88,6 +102,7 @@ class DeepPolyNetwork(torch.nn.Module):
         self.upper_bounds_list = []
         self.activation_list = []
 
+        self.net = torch.nn.Sequential(*self.layers)
    
     def forward(self, x):
         # perturb the input image passing the input through the infinity norm custom layer

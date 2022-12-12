@@ -5,9 +5,10 @@ from DeepPolyReluLayer import DeepPolyReluLayer
 from DeepPolyConvolutionalLayer import DeepPolyConvolutionalLayer
 from DeepPolyIdentityLayer import DeepPolyIdentityLayer
 from DeepPolyLinearLayer import DeepPolyLinearLayer
-from utils import tight_bounds
+from utils import tight_bounds, compute_out_dimension
 from backsubstitution import backsubstitution
 from backsubstitution import compute_new_weights_and_bias
+import math
 
 class DeepPolyResnetBlock(torch.nn.Module):
     """
@@ -15,14 +16,15 @@ class DeepPolyResnetBlock(torch.nn.Module):
     """
     
     # create a list of custom layers from the path
-    def parse_paths(self, path):
+    def parse_paths(self, path, out_dimension):
         path = list(path)
         layers = []
         for p in path:
+            out_dimension = compute_out_dimension(out_dimension, p)
             if type(p) == torch.nn.modules.Conv2d:
                 layers.append(DeepPolyConvolutionalLayer(p))
             elif type(p) == torch.nn.modules.activation.ReLU:
-                layers.append(DeepPolyReluLayer(p))
+                layers.append(DeepPolyReluLayer(p, out_dimension))
             elif type(p) == torch.nn.modules.Identity:
                 layers.append(DeepPolyIdentityLayer(p))
             else:
@@ -30,12 +32,12 @@ class DeepPolyResnetBlock(torch.nn.Module):
             
         return layers
     
-    def __init__(self, l, prev_layers):
+    def __init__(self, l, prev_layers, out_dimension):
         super().__init__()
 
         self.block = l
-        self.path_a = self.parse_paths(l.path_a)
-        self.path_b = self.parse_paths(l.path_b)
+        self.path_a = self.parse_paths(l.path_a, out_dimension)
+        self.path_b = self.parse_paths(l.path_b, out_dimension)
 
         self.prev_layers = prev_layers
     

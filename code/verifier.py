@@ -4,6 +4,10 @@ import torch
 import torch.nn.functional as F
 from networks import get_network, get_net_name, NormalizedResnet
 from DeepPolyNetwork import DeepPolyNetwork
+from DeepPolyAlphaLoss import DeepPolyAlphaLoss
+from DeepPolyReluLayer import DeepPolyReluLayer
+import torch.optim as optim
+
 
 
 DEVICE = 'cpu'
@@ -67,25 +71,72 @@ def get_net(net, net_name):
 # eps: the epsilon value specified in the test case
 # true_label: the true label of the input image specified in the test case
 # return: 1 if the network is verified, 0 otherwise
-# TODO: Implement the analysis function
 def analyze(net, inputs, eps, true_label):    
+    def count_parameters2(model):
+        return sum(p.numel() for p in model.parameters() if p.requires_grad)
     # create a DeepPolyNetwork object
     deepPolyNetwork = DeepPolyNetwork(net, eps)
-    # forward the input image through the network to create the final output bounds
-    _, lower_bounds_list, upper_bounds_list = deepPolyNetwork(inputs)
+    # _, lower_bounds_list, upper_bounds_list = deepPolyNetwork(inputs)
+    # lower = lower_bounds_list[-1].tolist()[0]
+    # upper = upper_bounds_list[-1].tolist()[0]
+
+    # print(true_label)
+    # print(lower)
+    # print(upper)
+
+    # counter = 0
+    # for u in upper:
+    #     counter += int((lower[true_label] > u))
+    # if counter == 9:
+    #     return True
+    
+    # for module in deepPolyNetwork.modules():
+    #     if type(module) != DeepPolyReluLayer:
+    #         module.requires_grad_(False)
+    #     else:
+    #         module.requires_grad_(True)
+            
+    # def count_parameters(model):
+    #     total_params = 0
+    #     for name, parameter in model.named_parameters():
+    #         if not parameter.requires_grad: continue
+    #         params = parameter.numel()
+    #         print(f"Layer: {name} | Params: {params}")
+    #         total_params += params
+    #     return total_params
+    # # print(count_parameters2(deepPolyNetwork))
+    # # print(count_parameters(deepPolyNetwork))
+    
+    # create Loss
+    deepPolyAlphaLoss = DeepPolyAlphaLoss()
+    # create optimizer
+    optimizer = optim.Adam(deepPolyNetwork.parameters(), lr=0.1)
 
     # get the output bounds of the network (last tensor of the list) and bring it to a list
-    lower = lower_bounds_list[-1].tolist()[0]
-    upper = upper_bounds_list[-1].tolist()[0]
-    
-    print(true_label)
-    print(lower)
-    print(upper)
-    # check if there is an intersection between the output bounds and the true label bound
-    counter = 0
-    for u in upper:
-        counter += int((lower[true_label] > u))
-    return counter == 9
+    counter_loss = 1
+    while(True):
+        print(counter_loss)
+        counter_loss += 1
+        optimizer.zero_grad()
+        
+        # forward the input image through the network to create the final output bounds
+        _, lower_bounds_list, upper_bounds_list = deepPolyNetwork(inputs)
+        loss = deepPolyAlphaLoss(lower_bounds_list[-1], upper_bounds_list[-1], true_label)
+        loss.backward()
+        optimizer.step()
+        
+        lower = lower_bounds_list[-1].tolist()[0]
+        upper = upper_bounds_list[-1].tolist()[0]
+        
+        print(true_label)
+        print(lower)
+        print(upper)
+        # check if there is an intersection between the output bounds and the true label bound
+        counter = 0
+        for u in upper:
+            counter += int((lower[true_label] > u))
+        if counter == 9:
+            return True
 
 def main():
     parser = argparse.ArgumentParser(description='Neural network verification using DeepPoly relaxation')

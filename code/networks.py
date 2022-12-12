@@ -24,6 +24,7 @@ class FullyConnected(nn.Module):
     def __init__(self, device, dataset, input_size, input_channels, fc_layers, act='relu'):
         super(FullyConnected, self).__init__()
 
+        self.dataset = dataset
         # Normalization layer with mean and standard deviation based on the dataset
         # and flatten the input
         layers = [Normalization(device, dataset), nn.Flatten()]
@@ -51,6 +52,7 @@ class Conv(nn.Module):
 
         self.input_size = input_size
         self.n_class = n_class
+        self.dataset = dataset
 
         layers = [Normalization(device, dataset)]
         prev_channels = input_channels
@@ -85,6 +87,7 @@ class NormalizedResnet(nn.Module):
         # Normalization layer with mean and standard deviation based on the dataset
         self.normalization = Normalization(device, 'cifar10')
         self.resnet = resnet
+        self.dataset = 'cifar10'
 
     def forward(self, x):
         x = self.normalization(x)
