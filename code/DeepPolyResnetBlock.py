@@ -63,25 +63,21 @@ class DeepPolyResnetBlock(torch.nn.Module):
         
         
     def forward(self, x, lower_bound, upper_bound, input_shape, first_lower_bound, first_upper_bound):
-        
         # compute the forward of path_a
         if VERBOSE:
             print("Forward pass: path a")
         x_a, lower_bound_a, upper_bound_a, input_shape_a = torch.clone(x), torch.clone(lower_bound), torch.clone(upper_bound), input_shape
         # we need to compute the backsubstitution to the begining of the NETWORK, therefore we need to know which layers come before
         previous_layers_a = self.prev_layers + self.path_a
-        for i, layer in enumerate(self.path_a):
+        for i, layer in enumerate(self.path_a):   
+            
             # forward pass of current layer of path_a
-            print(self.path_a)
             x_a, lower_bound_a, upper_bound_a, input_shape_a = layer(x_a, lower_bound_a, upper_bound_a, input_shape_a)
+            
             # perform backsubstitution all the way to the begining of the NETWORK if needed
             if (type(layer) == DeepPolyLinearLayer or type(layer) == DeepPolyConvolutionalLayer) and i > 1:
-                print("BACKSUBSTITUTION PATH A")
-                print("i: ", i)
-                print("len(self.prev_layers): ", len(self.prev_layers))
                 lower_bound_a, upper_bound_a = self.backsubstitute(previous_layers_a, i + len(self.prev_layers), x_a, lower_bound_a, upper_bound_a, first_lower_bound, first_upper_bound)
-   
-        print("FINE PATH A")
+        
         # compute the forward of path_b
         if VERBOSE:
             print("Forward pass: path b")
@@ -91,44 +87,38 @@ class DeepPolyResnetBlock(torch.nn.Module):
         for i, layer in enumerate(self.path_b):
             # forward pass of current layer of path_b
             x_b, lower_bound_b, upper_bound_b, input_shape_b = layer(x_b, lower_bound_b, upper_bound_b, input_shape_b)
+                
             #  perform backsubstitution all the way to the begining of the NETWORK if needed
             if (type(layer) == DeepPolyLinearLayer or type(layer) == DeepPolyConvolutionalLayer) and i > 1:
-                print("BACKSUBSTITUTION PATH B")
-                print("i: ", i)
-                print("len(self.prev_layers): ", len(self.prev_layers))
                 lower_bound_b, upper_bound_b = self.backsubstitute(previous_layers_b, i + len(self.prev_layers), x_b, lower_bound_b, upper_bound_b, first_lower_bound, first_upper_bound)
-        print("FINE PATH B")
-        print(type(layer))
-        #print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
-        #print(lower_bound_a.shape)
+
        
         assert x_a.shape == x_b.shape, "DeepPolyResnetBlock forward: the two paths have different shapes of input"
         assert lower_bound_a.shape == lower_bound_b.shape, "DeepPolyResnetBlock forward: the two paths have different shapes of lower bound"
         assert upper_bound_a.shape == upper_bound_b.shape, "DeepPolyResnetBlock forward: the two paths have different shapes of upper bound"
         assert input_shape_a == input_shape_b, "DeepPolyResnetBlock forward: the two paths have different shapes of input"
         
-        starting_lower_weights_a=previous_layers_a[-1].weights
-        starting_upper_weights_a=previous_layers_a[-1].weights
-        starting_lower_bias_a=previous_layers_a[-1].bias#.reshape(1,-1)
-        starting_upper_bias_a=previous_layers_a[-1].bias#.reshape(1,-1)
-        
-        print(starting_lower_bias_a.shape)
-        
-        starting_lower_weights_b=previous_layers_b[-1].weights
-        starting_upper_weights_b=previous_layers_b[-1].weights
-        starting_lower_bias_b=previous_layers_b[-1].bias#.reshape(1,-1)
-        starting_upper_bias_b=previous_layers_b[-1].bias#.reshape(1,-1)
-        print("PROBLEMAAAAAAAAAAAAAAA")
-        # qua il problema...
-        
-        print(previous_layers_a[1:len(previous_layers_a)-1])
-        W_a_lower, W_a_upper, b_a_lower, b_a_upper=compute_new_weights_and_bias(previous_layers_a[1:len(previous_layers_a)-1], starting_lower_weights_a, starting_upper_weights_a, starting_lower_bias_a, starting_upper_bias_a)
-        W_b_lower, W_b_upper, b_b_lower, b_b_upper=compute_new_weights_and_bias(previous_layers_b[1:len(previous_layers_b)-1], starting_lower_weights_b, starting_upper_weights_b, starting_lower_bias_b, starting_upper_bias_b)
+        starting_lower_weights_a = previous_layers_a[-1].weights
+        starting_upper_weights_a = previous_layers_a[-1].weights
+        starting_lower_bias_a = previous_layers_a[-1].bias  # .reshape(1,-1)
+        starting_upper_bias_a = previous_layers_a[-1].bias  # .reshape(1,-1)
 
-        W_tot_lower=W_a_lower+W_b_lower
-        W_tot_upper=W_a_upper+W_b_upper
-        b_tot_lower=b_a_lower+b_b_lower
-        b_tot_upper=b_a_upper+b_b_upper
+        W_a_lower, W_a_upper, b_a_lower, b_a_upper = compute_new_weights_and_bias(
+            previous_layers_a[1:-1], starting_lower_weights_a, starting_upper_weights_a, starting_lower_bias_a, starting_upper_bias_a)
+        
+        starting_lower_weights_b = previous_layers_b[-1].weights
+        starting_upper_weights_b = previous_layers_b[-1].weights
+        starting_lower_bias_b = previous_layers_b[-1].bias  # .reshape(1,-1)
+        starting_upper_bias_b = previous_layers_b[-1].bias  # .reshape(1,-1)
+
+        # qua il problema...
+        W_b_lower, W_b_upper, b_b_lower, b_b_upper = compute_new_weights_and_bias(
+            previous_layers_b[1:-1], starting_lower_weights_b, starting_upper_weights_b, starting_lower_bias_b, starting_upper_bias_b)
+
+        W_tot_lower = W_a_lower + W_b_lower
+        W_tot_upper = W_a_upper + W_b_upper
+        b_tot_lower = b_a_lower + b_b_lower
+        b_tot_upper = b_a_upper + b_b_upper
         
         new_lower_bound_tmp=torch.matmul(first_lower_bound, W_tot_lower)+b_tot_lower
         new_upper_bound_tmp=torch.matmul(first_upper_bound, W_tot_upper)+b_tot_upper

@@ -74,7 +74,6 @@ def analyze(net, inputs, eps, true_label):
     # forward the input image through the network to create the final output bounds
     _, lower_bounds_list, upper_bounds_list = deepPolyNetwork(inputs)
 
-    
     # get the output bounds of the network (last tensor of the list) and bring it to a list
     lower = lower_bounds_list[-1].tolist()[0]
     upper = upper_bounds_list[-1].tolist()[0]
