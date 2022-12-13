@@ -90,11 +90,11 @@ def analyze(net, inputs, eps, true_label):
     # if counter == 9:
     #     return True
     
-    # for module in deepPolyNetwork.modules():
-    #     if type(module) != DeepPolyReluLayer:
-    #         module.requires_grad_(False)
-    #     else:
-    #         module.requires_grad_(True)
+    for module in deepPolyNetwork.modules():
+         if type(module) != DeepPolyReluLayer:
+             module.requires_grad_(False)
+         else:
+             module.requires_grad_(True)
             
     # def count_parameters(model):
     #     total_params = 0
@@ -114,7 +114,8 @@ def analyze(net, inputs, eps, true_label):
 
     # get the output bounds of the network (last tensor of the list) and bring it to a list
     counter_loss = 1
-    while(True):
+    boh=0
+    while(True): #True
         print(counter_loss)
         counter_loss += 1
         optimizer.zero_grad()
@@ -124,7 +125,22 @@ def analyze(net, inputs, eps, true_label):
         loss = deepPolyAlphaLoss(lower_bounds_list[-1], upper_bounds_list[-1], true_label)
         loss.backward()
         optimizer.step()
+        # restricted optimization problem: alpha in [0, 1] (this solution is not very elegant, but it works)
+        with torch.no_grad():
+            for param in deepPolyNetwork.parameters():
+                if param.requires_grad:
+                    param.data.clamp_(0, 1)
+            """for name, param in deepPolyNetwork.named_parameters():
+                if param.requires_grad:
+                    param.data.clamp_(0, 1)"""
+        print("DAJEEEEE ALPHAAAAAAAA")
+        print(deepPolyNetwork.parameters())
+       
         
+        for name, param in deepPolyNetwork.named_parameters():
+            if param.requires_grad:
+                print(name, param.data)
+
         lower = lower_bounds_list[-1].tolist()[0]
         upper = upper_bounds_list[-1].tolist()[0]
         

@@ -13,4 +13,4 @@ class DeepPolyAlphaLoss(torch.nn.Module):
         g = target_lower_bound.repeat(10) - upper_bounds
         g[target] = 0
         
-        return -torch.sum(g)
+        return -torch.sum(g**2)
