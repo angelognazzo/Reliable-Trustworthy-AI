@@ -1,0 +1,25 @@
+net_1,img3_0.0091.txt, verified OK
+net_1,img6_0.0153.txt, verified OK
+net_2,img3_0.2301.txt, not verified OK
+net_2,img8_0.2009.txt, not verified OK
+net_3,img10_0.0041.txt,not verified OK
+net_3,img3_0.0090.txt, verified OK
+net_4,img4_0.1502.txt, verified OK
+net_4,img9_0.0097.txt, verified OK
+net_5,img2_0.0588.txt, verified OK
+net_5,img9_0.0159.txt, not verified OK
+net_6,img3_0.0315.txt, not verified NOT OK 
+net_6,img5_0.0103.txt, verified NOT OK
+net_6,img8_0.0126.txt, verified OK
+net_7,img2_0.0344.txt, verified OK
+net_7,img6_0.2004.txt, verified OK
+net_7,img9_0.2502.txt, not verified OK
+net_8,img10_0.0092.txt,not verified OK
+net_8,img3_0.0082.txt, verified OK
+net_8,img7_0.0078.txt, verified NOT OK
+net9,img1_0.0037.txt,  CRASHED
+net9,img7_0.0042.txt,  CRASHED
+net9,img9_0.0043.txt,  CRASHED
+net_10,img10_0.0017.txt, not verified NOT OK
+net_10,img3_0.0015.txt, not verified OK
+net_10,img6_0.0016.txt, not verified NOT OK
