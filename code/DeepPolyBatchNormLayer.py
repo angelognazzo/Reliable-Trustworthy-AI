@@ -22,6 +22,11 @@ class DeepPolyBatchNormLayer(torch.nn.Module):
         
         
     def forward(self, x, lower_bound, upper_bound, gamma, beta, mean, var, eps, input_shape):
+        
+        x = x.reshape(input_shape)
+        lower_bound = lower_bound.reshape(input_shape)
+        upper_bound = upper_bound.reshape(input_shape)
+        
         if VERBOSE:
             print("DeepPolyBatchNormLayer: x shape %s, lower_bound shape %s, upper_bound shape %s" % (
                 str(x.shape), str(lower_bound.shape), str(upper_bound.shape)))
@@ -33,6 +38,10 @@ class DeepPolyBatchNormLayer(torch.nn.Module):
 
         self.weights = torch.diag(w)
         self.bias = b.reshape(1, -1)
+        # perform batch normalization on the actual input
+        x= self.layer(x)
+        lower_bound = self.layer(lower_bound)
+        upper_bound = self.layer(upper_bound)
 
         return x, lower_bound, upper_bound, input_shape
     
