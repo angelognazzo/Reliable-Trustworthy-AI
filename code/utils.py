@@ -52,6 +52,8 @@ def compute_out_dimension(out_dimension, l):
         return out_dimension
     elif isinstance(l, torch.nn.Linear):
         return (1, 1, l.out_features)
+    elif isinstance(l, torch.nn.BatchNorm2d):
+        return out_dimension
     elif isinstance(l, torch.nn.Conv2d):
         w_dim = math.floor(
             (out_dimension[1] - l.kernel_size[0] + 2 * l.padding[0]) / l.stride[0]) + 1

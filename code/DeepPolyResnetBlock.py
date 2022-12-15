@@ -5,10 +5,10 @@ from DeepPolyReluLayer import DeepPolyReluLayer
 from DeepPolyConvolutionalLayer import DeepPolyConvolutionalLayer
 from DeepPolyIdentityLayer import DeepPolyIdentityLayer
 from DeepPolyLinearLayer import DeepPolyLinearLayer
+from DeepPolyBatchNormLayer import DeepPolyBatchNormLayer
 from utils import tight_bounds, compute_out_dimension
 from backsubstitution import backsubstitution
 from backsubstitution import compute_new_weights_and_bias
-import math
 
 class DeepPolyResnetBlock(torch.nn.Module):
     """
@@ -27,6 +27,8 @@ class DeepPolyResnetBlock(torch.nn.Module):
                 layers.append(DeepPolyReluLayer(p, out_dimension))
             elif type(p) == torch.nn.modules.Identity:
                 layers.append(DeepPolyIdentityLayer(p))
+            elif type(p) == torch.nn.modules.BatchNorm2d:
+                layers.append(DeepPolyBatchNormLayer(p))
             else:
                 raise Exception("Unknown layer type")
             

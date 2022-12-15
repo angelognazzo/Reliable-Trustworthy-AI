@@ -4,12 +4,12 @@ from DeepPolyLinearLayer import DeepPolyLinearLayer
 from DeepPolyReluLayer import DeepPolyReluLayer
 from DeepPolyConvolutionalLayer import DeepPolyConvolutionalLayer
 from DeepPolyResnetBlock import DeepPolyResnetBlock
+from DeepPolyBatchNormLayer import DeepPolyBatchNormLayer
 from settings import VERBOSE
 from utils import tight_bounds, compute_out_dimension
 from backsubstitution import backsubstitution
 import networks
 import resnet
-import math
 
 
 class DeepPolyNetwork(torch.nn.Module):
@@ -88,6 +88,8 @@ class DeepPolyNetwork(torch.nn.Module):
                 self.layers.append(DeepPolyConvolutionalLayer(l))
             elif type(l) == resnet.BasicBlock:
                 self.layers.append(DeepPolyResnetBlock(l, self.layers[0:], out_dimension))
+            elif type(l) == torch.nn.modules.BatchNorm2d:
+                self.layers.append(DeepPolyBatchNormLayer(l))
             else:
                 raise Exception("DeepPolyNetwork constructor ERROR: layer type not supported")
             

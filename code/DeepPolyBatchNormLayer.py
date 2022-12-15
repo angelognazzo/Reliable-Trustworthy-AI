@@ -21,34 +21,38 @@ class DeepPolyBatchNormLayer(torch.nn.Module):
         self.bias = None
         
         
-    def forward(self, x, lower_bound, upper_bound, gamma, beta, mean, var, eps, input_shape):
+    def forward(self, x, lower_bound, upper_bound, input_shape):
         
-        # compute the weights and bias
-        var_sqrt = torch.sqrt(var + eps)
+        # compute the weights and bias of the layer
+        shape = input_shape
+        
+        var = self.var.reshape(-1, 1)  # (C, 1)
+        var = var.repeat(1, shape[2] * shape[3])  # (C, H*W)
+        var = var.flatten()  # (C*H*W, )
+        var = torch.sqrt(var + self.eps)  # sqrt(var_i + eps)
+        var = 1 / var
+        gamma = self.gamma.reshape(-1, 1)
+        gamma = gamma.repeat(1, shape[2] * shape[3])
+        gamma = gamma.flatten()
 
-        w_prime = gamma / var_sqrt
-        b = (- mean * gamma) / var_sqrt + beta
-        mult=torch.ones(1, input_shape[0]*input_shape[2]*input_shape[3])
-        w= torch.matmul(w_prime.reshape(-1, 1), mult).flatten()
-        self.weights = torch.diag(w)
-        self.bias = b.repeat(input_shape[0]*input_shape[2]*input_shape[3])
-        
-        
+        self.weights = torch.diag(gamma * var)
+
+        mean = self.mean.reshape(-1, 1)  # (C, 1)
+        mean = mean.repeat(1, shape[2] * shape[3])  # (C, H*W)
+        mean = mean.flatten()  # (C*H*W, )
+        bias = mean * var * gamma
+        self.bias = bias + self.beta.reshape(-1, 1).repeat(1, shape[2] * shape[3]).flatten().reshape(1, -1)
+       
+        # perform batch normalization on the actual input
         x = x.reshape(input_shape)
-        lower_bound = lower_bound.reshape(input_shape)
-        upper_bound = upper_bound.reshape(input_shape)
+        x = self.layer(x)
+        x = x.flatten().reshape(1, -1)
+        lower_bound = self.layer(lower_bound.reshape(shape)).flatten().reshape(1, -1)
+        upper_bound = self.layer(upper_bound.reshape(shape)).flatten().reshape(1, -1)
         
         if VERBOSE:
             print("DeepPolyBatchNormLayer: x shape %s, lower_bound shape %s, upper_bound shape %s" % (
                 str(x.shape), str(lower_bound.shape), str(upper_bound.shape)))
-        
-
-        # perform batch normalization on the actual input
-        x= self.layer(x)
-        lower_bound = self.layer(lower_bound)
-        upper_bound = self.layer(upper_bound)
-        
-
 
         return x, lower_bound, upper_bound, input_shape
     

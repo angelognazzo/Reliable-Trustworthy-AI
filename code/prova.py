@@ -1,11 +1,70 @@
 import torch
 
+torch.manual_seed(0)
+shape = (1, 3, 3, 3)
+m = torch.nn.BatchNorm2d(shape[1])
+x = torch.randn(shape)
+output = m(x)
 
-i = 5
-for i in range(i, -1, -1):
-    print(i)
+m.eval()
+print("gamma: ", m.weight, m.weight.shape)
+print("beta: ", m.bias, m.bias.shape)
+print("mean: ", m.running_mean, m.running_mean.shape)
+print("var: ", m.running_var, m.running_var.shape)
+print("eps: ", m.eps)
+output = m(x)
+print(x)
+print(output)
 
 
+var = m.running_var.reshape(-1, 1)  # (C, 1)
+var = var.repeat(1, shape[2] * shape[3])  # (C, H*W)
+var = var.flatten()  # (C*H*W, )
+var = torch.sqrt(var + m.eps)  # sqrt(var_i + eps)
+var = 1 / var
+gamma = m.weight.reshape(-1, 1)
+gamma = gamma.repeat(1, shape[2] * shape[3])
+gamma = gamma.flatten()
+
+w = torch.diag(gamma * var)
+
+mean = m.running_mean.reshape(-1, 1)  # (C, 1)
+mean = mean.repeat(1, shape[2] * shape[3])  # (C, H*W)
+mean = mean.flatten()  # (C*H*W, )
+bias = mean * var * gamma
+bias = bias + m.bias.reshape(-1, 1).repeat(1, shape[2] * shape[3]).flatten()
+
+bound = x.flatten()
+output2 = torch.matmul(w, bound) - bias
+
+print(output.flatten())
+print(output2)
+exit()
+mean = m.running_mean.reshape(-1, 1) # (C, 1)
+mean = mean.repeat(1, shape[2] * shape[3]) # (C, H*W)
+mean = mean.flatten() # (C*H*W, )
+bound = x.flatten()
+mean = 1 - mean / bound # 1 - mean_i / x_i
+
+var = m.running_var.reshape(-1, 1)  # (C, 1)
+var = var.repeat(1, shape[2] * shape[3])  # (C, H*W)
+var = var.flatten()  # (C*H*W, )
+var = torch.sqrt(var + m.eps)  # sqrt(var_i + eps)
+# print(var)
+
+w = torch.diag(mean / var)
+bound = bound.reshape(-1, 1)
+output2 = torch.matmul(w, bound)
+
+
+print(output.flatten())
+print(output2)
+assert torch.allclose(output.flatten(), output2)
+
+
+
+
+exit()
 # With Learnable Parameters
 m = torch.nn.BatchNorm2d(2)
 # Without Learnable Parameters

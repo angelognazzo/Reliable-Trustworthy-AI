@@ -22,8 +22,8 @@ class DeepPolyConvolutionalLayer(torch.nn.Module):
         self.output_shape = None
         
         if VERBOSE:
-            print("DeepPolyConvolutionalLayer: weights shape: %s, bias shape %s, stride %s, padding %s" % (
-                str(self.kernel.shape), str(self.bias_kernel.shape), str(self.stride), str(self.padding)))
+            print("DeepPolyConvolutionalLayer: weights shape: %s, stride %s, padding %s" % (
+                str(self.kernel.shape), str(self.stride), str(self.padding)))
 
     # swap the bounds depending on the sign of the weights
     # return new lower and upper bounds
@@ -47,6 +47,8 @@ class DeepPolyConvolutionalLayer(torch.nn.Module):
     
     
     def forward(self, x, lower_bound, upper_bound, input_shape):
+        if self.bias_kernel is None:
+            self.bias_kernel = torch.zeros(self.kernel.shape[0])
         # x, lower_bound and upper_bound are flattened (i.e. [1, 3072]), we want to reshape them to being a tensor so that we can perfrom the convolutions(i.e [1, 3, 32, 32])
         x = x.reshape(input_shape)
         lower_bound = lower_bound.reshape(input_shape)
@@ -56,12 +58,12 @@ class DeepPolyConvolutionalLayer(torch.nn.Module):
             print("DeepPolyConvolutionalLayer RESHAPE: x shape %s, lower_bound shape %s, upper_bound shape %s" % (
                 str(x.shape), str(lower_bound.shape), str(upper_bound.shape)))
         
+        # perform convolution on the actual input
+        x = self.layer(x)
+        
         # perform forward of the DeepPoly convolutional layer
         lower_bound, upper_bound = self.swap_and_forward(
             lower_bound, upper_bound, self.kernel, self.bias_kernel, self.stride, self.padding)
-        
-        # perform convolution on the actual input
-        x = self.layer(x)
 
         if VERBOSE:
             print("DeepPolyConvolutionalLayer: x shape %s, lower_bound shape %s, upper_bound shape %s" % (
@@ -78,7 +80,7 @@ class DeepPolyConvolutionalLayer(torch.nn.Module):
         self.weights = torch.flatten(w, start_dim=0, end_dim=2).t()
 
         b = torch.ones(w.shape[:-1]) * self.bias_kernel[:, None, None]
-        self.bias = torch.flatten(b).reshape(1,-1) # qua stai attento
+        self.bias = torch.flatten(b).reshape(1,-1)
         
         input_shape = x.shape
         x = x.flatten(start_dim=1, end_dim=-1)
