@@ -35,7 +35,7 @@ class DeepPolyNetwork(torch.nn.Module):
             #  get the actual resnet from the 'normalized resnet' object
             dataset = self.net.dataset
             self.net = self.net.resnet
-            print(self.net)
+            # print(self.net)
             # get all the layers of the resnet
             l = list(self.net.modules())
             i = 1
@@ -164,6 +164,7 @@ class DeepPolyNetwork(torch.nn.Module):
 
                 # update the lower and upper bounds
                 lower_bound, upper_bound = tight_bounds(lower_bound, upper_bound, lower_bound_tmp, upper_bound_tmp)
+                
                 
                 # the correct order now should be respected
                 assert (lower_bound <= upper_bound).all(), "DeepPolyNetwork forward: Error with the box bounds: lower > upper"
