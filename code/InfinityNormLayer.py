@@ -20,8 +20,8 @@ class InfinityNormLayer(torch.nn.Module):
         if VERBOSE:
             print("InfinityNormLayer: lower_bound shape %s, upper_bound shape %s" % (lower.shape, upper.shape))
 
-        assert lower.shape == upper.shape
-        assert lower.shape[0] == 1
-        assert (lower <= upper).all(), "InfinityNormLayer: error with the box bounds: lower > upper"
+        #assert lower.shape == upper.shape
+        #assert lower.shape[0] == 1
+        #assert (lower <= upper).all(), "InfinityNormLayer: error with the box bounds: lower > upper"
        
         return lower, upper

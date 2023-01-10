@@ -74,50 +74,44 @@ def get_net(net, net_name):
 def analyze(net, inputs, eps, true_label):    
 
     # create a DeepPolyNetwork object
-    deepPolyNetwork = DeepPolyNetwork(net, eps)
-    
-    for module in deepPolyNetwork.modules():
-         if type(module) != DeepPolyReluLayer:
-             module.requires_grad_(False)
-         else:
-             module.requires_grad_(True)
+    deepPolyNetwork = DeepPolyNetwork(net, eps, true_label)
+        
+    def count_parameters(model):
+        total_params = 0
+        for name, parameter in model.named_parameters():
+            if not parameter.requires_grad: continue
+            params = parameter.numel()
+            print(f"Layer: {name} | Params: {params}")
+            total_params += params
+        return total_params
+    # print(list(deepPolyNetwork.parameters())[0].grad)
+    # print(count_parameters(deepPolyNetwork))
     
     # create Loss
     deepPolyAlphaLoss = DeepPolyAlphaLoss()
     # create optimizer
-    optimizer = optim.Adam(deepPolyNetwork.parameters(), lr=0.1)
+    optimizer = optim.AdamW(deepPolyNetwork.parameters(), lr=1.5)
 
     # get the output bounds of the network (last tensor of the list) and bring it to a list
     counter_loss = 1
     while(True): #True
-        print(counter_loss)
         counter_loss += 1
-        if counter_loss > 2:
+        #print("ALPHA ITERATION")
+        #print(counter_loss)
+        if counter_loss > 60:
             return False
         optimizer.zero_grad()
         
         # forward the input image through the network to create the final output bounds
-        _, lower_bounds_list, upper_bounds_list = deepPolyNetwork(inputs)
-        loss = deepPolyAlphaLoss(lower_bounds_list[-1], upper_bounds_list[-1], true_label)
+        lower_bound, upper_bound = deepPolyNetwork(inputs)
+        lower_bound = lower_bound.flatten()
+        upper_bound = upper_bound.flatten()
+        # compute the loss
+        loss = deepPolyAlphaLoss(lower_bound)
         loss.backward()
         optimizer.step()
-        # restricted optimization problem: alpha in [0, 1] (this solution is not very elegant, but it works)
-        with torch.no_grad():
-            for param in deepPolyNetwork.parameters():
-                if param.requires_grad:
-                    param.data.clamp_(0, 1)
-       
-        lower = lower_bounds_list[-1].tolist()[0]
-        upper = upper_bounds_list[-1].tolist()[0]
-        
-        print(true_label)
-        print(lower)
-        print(upper)
         # check if there is an intersection between the output bounds and the true label bound
-        counter = 0
-        for u in upper:
-            counter += int((lower[true_label] > u))
-        if counter == 9:
+        if (lower_bound > 0).all():
             return True
 
 def main():

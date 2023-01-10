@@ -1,91 +1,79 @@
 import torch
 from settings import VERBOSE
 import torch.nn.functional as F
+from backsubstitution import backsubstitution
+#from math import sqrt
+#import numpy as np
+
 
 class DeepPolyConvolutionalLayer(torch.nn.Module):
     """
     Class implementing the ConvolutionalLayer of the DeepPoly algorithm
     """
     
-    def __init__(self, layer) -> None:
+    def __init__(self, layer, previous_layers, input_shape) -> None:
         super().__init__()
-        self.layer = layer
-        self.kernel = layer.weight
-        self.weights = None 
+        self.previous_layers = previous_layers
+        self.input_shape = (1, input_shape[0], input_shape[1], input_shape[2])
+        self.input_shape_flatten = input_shape[0] * input_shape[1] * input_shape[2]
         
-        self.bias_kernel = layer.bias
-        self.bias = None
+        self.isRes=False
         
+        self.kernel = layer.weight.detach()
+        if layer.bias is None:
+            self.bias_kernel = None
+        else:
+            self.bias_kernel = layer.bias.detach()
         self.stride = layer.stride
-        self.padding = layer.padding
-        
-        self.output_shape = None
+        self.padding = layer.padding 
+        self.lower_weights = None
+        self.upper_weights = None
+        self.lower_bias = None
+        self.upper_bias = None
         
         if VERBOSE:
             print("DeepPolyConvolutionalLayer: weights shape: %s, stride %s, padding %s" % (
                 str(self.kernel.shape), str(self.stride), str(self.padding)))
 
-    # swap the bounds depending on the sign of the weights
-    # return new lower and upper bounds
-    def swap_and_forward(self, lower_bound, upper_bound, weights, bias, stride, padding):
-        negative_mask = (weights < 0).int()
-        positive_mask = (weights >= 0).int()
+    def forward(self, lower_bound, upper_bound, first_lower_bound, first_upper_bound, flag):
 
-        negative_weights = torch.mul(negative_mask, weights)
-        positive_weights = torch.mul(positive_mask, weights)
- 
-        lower_bound_new = F.conv2d(upper_bound, negative_weights, bias, stride, padding) + \
-            F.conv2d(lower_bound, positive_weights, bias, stride, padding) + bias.reshape(1, -1, 1, 1)
-
-        upper_bound_new = F.conv2d(lower_bound, negative_weights, bias, stride, padding) + \
-            F.conv2d(upper_bound, positive_weights, bias, stride, padding) + bias.reshape(1, -1, 1, 1)
-            
-        assert lower_bound_new.shape == upper_bound_new.shape, "swap_and_forward: lower and upper bounds have different shapes"
-        assert (lower_bound_new <= upper_bound_new).all(), "swap_and_forward: error with the box bounds: lower > upper"
-
-        return lower_bound_new.flatten(start_dim=1, end_dim=-1), upper_bound_new.flatten(start_dim=1, end_dim=-1)
-    
-    
-    def forward(self, x, lower_bound, upper_bound, input_shape):
         if self.bias_kernel is None:
             self.bias_kernel = torch.zeros(self.kernel.shape[0])
-        # x, lower_bound and upper_bound are flattened (i.e. [1, 3072]), we want to reshape them to being a tensor so that we can perfrom the convolutions(i.e [1, 3, 32, 32])
-        x = x.reshape(input_shape)
-        lower_bound = lower_bound.reshape(input_shape)
-        upper_bound = upper_bound.reshape(input_shape)
-        
-        if VERBOSE:
-            print("DeepPolyConvolutionalLayer RESHAPE: x shape %s, lower_bound shape %s, upper_bound shape %s" % (
-                str(x.shape), str(lower_bound.shape), str(upper_bound.shape)))
-        
-        # perform convolution on the actual input
-        x = self.layer(x)
-        
-        # perform forward of the DeepPoly convolutional layer
-        lower_bound, upper_bound = self.swap_and_forward(
-            lower_bound, upper_bound, self.kernel, self.bias_kernel, self.stride, self.padding)
-
-        if VERBOSE:
-            print("DeepPolyConvolutionalLayer: x shape %s, lower_bound shape %s, upper_bound shape %s" % (
-                str(x.shape), str(lower_bound.shape), str(upper_bound.shape)))
-        
-        w = torch.eye(input_shape.numel()).view(list(input_shape) + [input_shape.numel()])
+       
+        w = torch.eye(self.input_shape_flatten).view(list(self.input_shape) + [self.input_shape_flatten])
         w = w.permute(0, 1, 4, 2, 3)
-
         w = F.conv3d(w, self.kernel.unsqueeze(2), stride=tuple(
             [1] + list(self.stride)), padding=tuple([0] + list(self.padding))).permute(0, 1, 3, 4, 2)
         
         # remove the first empty dimension
         w = w[0]
-        self.weights = torch.flatten(w, start_dim=0, end_dim=2).t()
+        weights = torch.flatten(w, start_dim=0, end_dim=2).t()
+        self.lower_weights = weights
+        self.upper_weights = weights
 
         b = torch.ones(w.shape[:-1]) * self.bias_kernel[:, None, None]
-        self.bias = torch.flatten(b).reshape(1,-1)
+        bias = torch.flatten(b).reshape(1,-1)
+        self.lower_bias = bias
+        self.upper_bias = bias
         
-        input_shape = x.shape
-        x = x.flatten(start_dim=1, end_dim=-1)
+        if flag==True:
+            lower_bound, upper_bound, _, _, _, _= backsubstitution(self.previous_layers + [self], first_lower_bound, first_upper_bound)
+        else:
+            bounds_upper=torch.empty_like(self.upper_bias)
+            bounds_lower=torch.empty_like(self.lower_bias)
+            upper_bound=bounds_upper.fill_( float("Inf"))
+            lower_bound=bounds_lower.fill_( -float("Inf"))
 
-        assert lower_bound.shape == x.shape == upper_bound.shape, "swap_and_forward CNN: lower and upper bounds have different shapes"
-        assert (lower_bound <= upper_bound).all(), "swap_and_forward CNN: error with the box bounds: lower > upper"
+        #assert lower_bound.shape == upper_bound.shape, "swap_and_forward CNN: lower and upper bounds have different shapes"
           
-        return x, lower_bound, upper_bound, input_shape
+        return lower_bound, upper_bound
+
+
+
+
+
+
+
+
+
+

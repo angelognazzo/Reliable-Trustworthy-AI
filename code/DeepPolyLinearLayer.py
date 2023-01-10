@@ -1,55 +1,37 @@
 import torch
 from settings import VERBOSE
-
+from backsubstitution import backsubstitution
 
 class DeepPolyLinearLayer(torch.nn.Module):
     """
     Class implementing the LinearLayer of the DeepPoly algorithm
     """
 
-    def __init__(self, net, layer) -> None:
+    def __init__(self, layer, previous_layers) -> None:
         super().__init__()
-        self.net = net
-        self.layer = layer
+        # self.layer = layer
+        self.previous_layers = previous_layers
         # we want 784x50 and not the opposite
-        self.weights = layer.weight.t()
+        self.lower_weights = layer.weight.detach().t()
+        self.upper_weights = layer.weight.detach().t()
         # we want 1x50 and not the opposite
-        self.bias = layer.bias.reshape(1, -1)
-
-    # swap the bounds depending on the sign of the weights
-    # return new lower and upper bounds
-    @staticmethod
-    def swap_and_forward(lower_bound, upper_bound, weights, bias):
+        self.lower_bias = layer.bias.detach().reshape(1, -1)
+        self.upper_bias = layer.bias.detach().reshape(1, -1)
         
-        negative_mask = (weights < 0).int()
-        positive_mask = (weights >= 0).int()
-
-        negative_weights = torch.mul(negative_mask, weights)
-        positive_weights = torch.mul(positive_mask, weights)
-
-        new_lower_bound = torch.matmul(upper_bound, negative_weights) + torch.matmul(lower_bound, positive_weights) + bias
-
-        new_upper_bound = torch.matmul(lower_bound, negative_weights) + torch.matmul(upper_bound, positive_weights) + bias
-
-
-        if VERBOSE:
-            print("DeepPolyLinearLayer swap_and_forward: lower_bound shape %s, upper_bound shape %s" % (new_lower_bound.shape, new_upper_bound.shape))
+        self.isRes=False
         
-        assert new_lower_bound.shape == new_upper_bound.shape, "swap_and_forward: lower and upper bounds have different shapes"
-        assert (new_lower_bound <= new_upper_bound).all(), "swap_and_forward: error with the box bounds: lower > upper"
-
-        return new_lower_bound, new_upper_bound
-
     # forward pass through the network
-    def forward(self, x, lower_bound, upper_bound, input_shape):
-        new_lower_bound, new_upper_bound = self.swap_and_forward(
-            lower_bound, upper_bound, self.weights, self.bias)
-        x = self.layer(x)
-        input_shape = x.shape
-        
+    def forward(self, lower_bound, upper_bound, first_lower_bound, first_upper_bound, flag):
+        if flag==True:
+            lower_bound, upper_bound, _, _, _, _= backsubstitution(self.previous_layers + [self], first_lower_bound, first_upper_bound)
+        else:
+            bounds_upper=torch.empty_like(self.upper_bias)
+            bounds_lower=torch.empty_like(self.lower_bias)
+            upper_bound=bounds_upper.fill_( float("Inf"))
+            lower_bound=bounds_lower.fill_( -float("Inf"))
+
         if VERBOSE:
-            print("DeepPolyLinearLayer: x shape %s" % (str(x.shape)))
-
-        assert new_lower_bound.shape[0] == x.shape[0]
-
-        return x, new_lower_bound, new_upper_bound, input_shape
+            print("DeepPolyLinearLayer: lower_boud shape %s" %(str(lower_bound.shape)))
+        
+                
+        return lower_bound, upper_bound

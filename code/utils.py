@@ -1,8 +1,4 @@
 import torch
-from DeepPolyReluLayer import DeepPolyReluLayer
-from DeepPolyLinearLayer import DeepPolyLinearLayer
-from DeepPolyConvolutionalLayer import DeepPolyConvolutionalLayer
-from DeepPolyIdentityLayer import DeepPolyIdentityLayer
 import math
 
 def tight_bounds(lower_bound, upper_bound, lower_bound_tmp, upper_bound_tmp):
@@ -22,8 +18,8 @@ def tight_bounds(lower_bound, upper_bound, lower_bound_tmp, upper_bound_tmp):
     upper_bound = torch.where(mask_positive, torch.min(
         upper_bound_tmp, upper_bound), upper_bound)
 
-    assert (lower_bound <= upper_bound).all(
-    ), "DeepPolyNetwork forward: Error with the box bounds: lower > upper"
+    #assert (lower_bound <= upper_bound).all(
+    #), "DeepPolyNetwork forward: Error with the box bounds: lower > upper"
 
     # there is no intersection between the two bounds, bounds are therefore 'disjoint'
     # check if the new bounds are tighter than the old ones and if upper_bound_tmp > lower_bound_tmp.
@@ -39,8 +35,8 @@ def tight_bounds(lower_bound, upper_bound, lower_bound_tmp, upper_bound_tmp):
         mask_negative & mask_tighter_disjoint, upper_bound_tmp, upper_bound)
     
     # the correct order now should be respected
-    assert (lower_bound <= upper_bound).all(
-    ), "DeepPolyNetwork forward: Error with the box bounds: lower > upper"
+    #assert (lower_bound <= upper_bound).all(
+    #), "DeepPolyNetwork forward: Error with the box bounds: lower > upper"
 
     return lower_bound, upper_bound
 

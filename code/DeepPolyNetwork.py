@@ -5,9 +5,9 @@ from DeepPolyReluLayer import DeepPolyReluLayer
 from DeepPolyConvolutionalLayer import DeepPolyConvolutionalLayer
 from DeepPolyResnetBlock import DeepPolyResnetBlock
 from DeepPolyBatchNormLayer import DeepPolyBatchNormLayer
+from DeepPolyFinalVerificationLayer import DeepPolyFinalVerificationLayer
 from settings import VERBOSE
-from utils import tight_bounds, compute_out_dimension
-from backsubstitution import backsubstitution
+from utils import compute_out_dimension
 import networks
 import resnet
 
@@ -16,28 +16,27 @@ class DeepPolyNetwork(torch.nn.Module):
     """
     Perform a DeepPoly analysis on the given network
     """
-    def __init__(self, net, eps) -> None:
+    def __init__(self, net, eps, true_label) -> None:
         super().__init__()
 
         self.eps = eps
-        self.net = net
         
+        self.infinity_norm_layer = InfinityNormLayer(self.eps)
         # contains the custom layers of the network
-        self.layers = [InfinityNormLayer(self.eps)]
+        layers = []
         
         # parse the network to understand which layers to create
         # in case of a resnet, parsing is more complicated because layers are nested in blocks
         layers_to_create = []
-        if type(self.net) == networks.NormalizedResnet:
+        if type(net) == networks.NormalizedResnet:
             
             # get the correct normalization layer
-            self.normalization_layer = self.net.normalization
+            self.normalization_layer = net.normalization
             #  get the actual resnet from the 'normalized resnet' object
-            dataset = self.net.dataset
-            self.net = self.net.resnet
-            # print(self.net)
+            dataset = net.dataset
+            net = net.resnet
             # get all the layers of the resnet
-            l = list(self.net.modules())
+            l = list(net.modules())
             i = 1
             while i < len(l):
                 
@@ -57,8 +56,8 @@ class DeepPolyNetwork(torch.nn.Module):
                     i += 1
         # in case of a normal network, parsing is easier, just get the correct field
         else:
-            dataset = self.net.dataset
-            layers_to_create = self.net.layers
+            dataset = net.dataset
+            layers_to_create = net.layers
             self.normalization_layer = layers_to_create[0]
 
         if dataset == 'mnist':
@@ -81,105 +80,59 @@ class DeepPolyNetwork(torch.nn.Module):
             out_dimension_tmp = compute_out_dimension(out_dimension, l)
             # create a custom layer based on the type of the original layer
             if type(l) == torch.nn.modules.linear.Linear:
-                self.layers.append(DeepPolyLinearLayer(net, l))
+                layers.append(DeepPolyLinearLayer(l, layers.copy()))
             elif type(l) == torch.nn.modules.activation.ReLU:
-                self.layers.append(DeepPolyReluLayer(l, out_dimension_tmp))
+                layers.append(DeepPolyReluLayer(l, layers.copy(), out_dimension_tmp))
             elif type(l) == torch.nn.modules.Conv2d:
-                self.layers.append(DeepPolyConvolutionalLayer(l))
+                layers.append(DeepPolyConvolutionalLayer(l, layers.copy(), out_dimension))
             elif type(l) == resnet.BasicBlock:
-                self.layers.append(DeepPolyResnetBlock(l, self.layers[0:], out_dimension))
+                layers.append(DeepPolyResnetBlock(l, layers.copy(), out_dimension))
             elif type(l) == torch.nn.modules.BatchNorm2d:
-                self.layers.append(DeepPolyBatchNormLayer(l))
+                layers.append(DeepPolyBatchNormLayer(l, layers.copy(), out_dimension))
             else:
                 raise Exception("DeepPolyNetwork constructor ERROR: layer type not supported")
             
             out_dimension = out_dimension_tmp
-
+            
+        layers.append(DeepPolyFinalVerificationLayer(layers.copy(), true_label))
         if VERBOSE:
-            print("DeepPolyNetwork: Created %s layers (Infinity norm layer included)" % (len(self.layers)))
+            print("DeepPolyNetwork: Created %s layers (Infinity norm layer included)" % (len(layers)))
 
-        assert len(self.layers) > 0, "DeepPolyNetwork constructor: no layers created"
+        #assert len(layers) > 0, "DeepPolyNetwork constructor: no layers created"
 
-        self.lower_bounds_list = []
-        self.upper_bounds_list = []
-        self.activation_list = []
-
-        self.net = torch.nn.Sequential(*self.layers)
+        # this field is used to let torch see the paramters to optimize of the custom layers (alpha of RELU)
+        self.sequential_layers = torch.nn.Sequential(*layers)
    
     def forward(self, x):
         # perturb the input image passing the input through the infinity norm custom layer
-        lower_bound, upper_bound = self.layers[0](x)
-        input_shape = x.shape
+        lower_bound, upper_bound = self.infinity_norm_layer(x)
         
         # normalize the input image and flatten
         lower_bound = self.normalization_layer(lower_bound).flatten().reshape(1, -1)
         upper_bound = self.normalization_layer(upper_bound).flatten().reshape(1, -1)
 
         # save the initial lower and upper bounds
-        self.lower_bounds_list.append(lower_bound)
-        self.upper_bounds_list.append(upper_bound)
-       
-        # pass x through normalization layers and flatten
-        x = self.normalization_layer(x)
-        x = x.flatten().reshape(1, -1)
-        self.activation_list.append(x)
-        
+        first_lower_bound = torch.clone(lower_bound)
+        first_upper_bound = torch.clone(upper_bound)
+
         # input dimensions should be the same even after our transformations
-        assert x.shape == lower_bound.shape == upper_bound.shape, "DeepPolyNetwork forward: input shape mismatch after normalization and flattening"
+        #assert lower_bound.shape == upper_bound.shape, "DeepPolyNetwork forward: input shape mismatch after normalization and flattening"
         if VERBOSE:
-            print("DeepPolyNetwork forward: shape after normalization and flattening: x: %s, lower bound %s, upper bound %s" % (x.shape, lower_bound.shape, upper_bound.shape))
+            print("DeepPolyNetwork forward: shape after normalization and flattening: lower bound %s, upper bound %s" % (lower_bound.shape, upper_bound.shape))
 
-        # perform the forward pass for each custom layer (skipping the infinity custom norm layer)
-        for i in range(1, len(self.layers)):
-            
-            # get the current layer
-            l = self.layers[i]
-
-            if VERBOSE:
-                print("DeepPolyNetwork: Forward pass for layer %s of type %s, out of %s layers" % (i + 1, type(l), len(self.layers)))
-
+        # perform the forward pass for each custom layer
+        for i in range(len(self.sequential_layers)):
+            l=self.sequential_layers[i]
             # ! perform the FORWARD pass for the current layer
-            # DeepPolyResnetBlock needs more parameters than the other layers (because it needs to perform backsubstitution by itself)
-            if type(l) == DeepPolyResnetBlock:
-                  x, lower_bound, upper_bound, input_shape = l(x, lower_bound, upper_bound, input_shape, self.lower_bounds_list[0], self.upper_bounds_list[0])
+            #print(i)
+            if i+1<=len(self.sequential_layers)-1:
+                if type(self.sequential_layers[i+1])==DeepPolyReluLayer or type(self.sequential_layers[i+1])==DeepPolyFinalVerificationLayer:
+                    flag=True
+                else: flag=False
+            elif type(l)==DeepPolyFinalVerificationLayer:
+                flag=True
             else:
-                  x, lower_bound, upper_bound, input_shape = l(x, lower_bound, upper_bound, input_shape)
+                flag=False
+            lower_bound, upper_bound = l(lower_bound, upper_bound, first_lower_bound, first_upper_bound, flag)
 
-            
-            if VERBOSE:
-                print("DeepPolyNetwork forward: shape after layer %s: x: %s, lower bound %s, upper bound %s" % (i + 1, x.shape, lower_bound.shape, upper_bound.shape))
-            assert x.shape == lower_bound.shape == upper_bound.shape, "DeepPolyNetwork forward: input shape mismatch after forward pass for layer %s" % (i)
-            
-            # if l not a RELU layer and we are at least at the second layer: perform backsubstitution
-            if (type(l) == DeepPolyLinearLayer or type(l) == DeepPolyConvolutionalLayer or type(l) == DeepPolyResnetBlock) and i > 1:
-                if VERBOSE:
-                    print("DeepPolyNetwork: Performing backsubstitution")
-                
-                # perform backsubstitution
-                lower_bound_tmp, upper_bound_tmp = backsubstitution(self.layers, i, x.shape[1], self.lower_bounds_list[0], self.upper_bounds_list[0])
-                
-                # dimensions should be preserved after backsubstitution
-                assert lower_bound_tmp.shape == lower_bound.shape
-                assert upper_bound_tmp.shape == upper_bound.shape
-
-                # update the lower and upper bounds
-                lower_bound, upper_bound = tight_bounds(lower_bound, upper_bound, lower_bound_tmp, upper_bound_tmp)
-                
-                
-                # the correct order now should be respected
-                assert (lower_bound <= upper_bound).all(), "DeepPolyNetwork forward: Error with the box bounds: lower > upper"
-                
-            # save the newly computed bounds
-            self.lower_bounds_list.append(lower_bound)
-            self.upper_bounds_list.append(upper_bound)
-            self.activation_list.append(x)
-
-        if VERBOSE:
-            print("DeepPolyNetwork: Forward pass completed")
-
-        # number of lower and upper bounds should be the same
-        assert len(self.lower_bounds_list) == len(self.upper_bounds_list), "DeepPolyNetwork forward pass completed: Error: number of lower bounds != number of upper bounds"
-        # the correct order now should be respected
-        assert (lower_bound <= upper_bound).all(), "DeepPolyNetwork forward pass completed: Error with the box bounds: lower > upper"
-        
-        return x, self.lower_bounds_list, self.upper_bounds_list
+        return lower_bound, upper_bound

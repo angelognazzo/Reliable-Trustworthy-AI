@@ -6,18 +6,25 @@ class DeepPolyIdentityLayer(torch.nn.Module):
     Class implementing the identity layer of the DeepPoly algorithm
     """
     
-    def __init__(self, l):
+    def __init__(self, layer, previous_layers, input_shape):
         super().__init__()
         
-        self.layer = l
-        self.weights = None
-        self.bias = None
+        self.input_shape = (1, input_shape[0], input_shape[1], input_shape[2])
+        self.input_shape_flatten = input_shape[0] * input_shape[1] * input_shape[2]
+        self.lower_weights = None
+        self.upper_weights = None
+        self.lower_bias = None
+        self.upper_bias = None
         
-    def forward(self, x, lower_bound, upper_bound, input_shape):
+        self.isRes=False
+        
+    def forward(self, lower_bound, upper_bound, first_lower_bound, first_upper_bound, flag):
         if VERBOSE:
-            print("DeepPolyIdentityLayer: x shape %s, lower_bound shape %s, upper_bound shape %s" % (
-                str(x.shape), str(lower_bound.shape), str(upper_bound.shape)))
-        self.weights = torch.eye(input_shape.numel())
-        self.bias = torch.zeros(1, input_shape.numel())
+            print("DeepPolyIdentityLayer: lower_bound shape %s, upper_bound shape %s" % (
+                str(lower_bound.shape), str(upper_bound.shape)))
+        self.lower_weights = torch.eye(self.input_shape_flatten)
+        self.upper_weights = torch.eye(self.input_shape_flatten)
+        self.lower_bias = torch.zeros(1, self.input_shape_flatten)
+        self.upper_bias = torch.zeros(1, self.input_shape_flatten)
        
-        return x, lower_bound, upper_bound, input_shape
+        return lower_bound, upper_bound
