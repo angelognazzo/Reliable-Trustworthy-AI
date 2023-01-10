@@ -1,6 +1,0 @@
-net_1,img3_0.0091.txt,not verified
-net_1,img6_0.0153.txt,verified
-net_2,img3_0.2301.txt,not verified
-net_2,img8_0.2009.txt,not verified
-net_3,img10_0.0041.txt,not verified
-net_3,img3_0.0090.txt,verified
